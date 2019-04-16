@@ -6,6 +6,10 @@
 #include "../include/cdata.h"
 #include <ucontext.h>
 
+#define ALTA_PRIORIDADE 0
+#define MEDIA_PRIORIDADE 1
+#define BAIXA_PRIORIDADE 2
+ 
 // essa é a thread que está em execução no momento
 TCB_t *runningThread;
 
@@ -16,6 +20,12 @@ TCB_t *mainThread;
 // por tirar uma thread da fila de aptos e por em execução
 ucontext_t schedulerC;
 
+//fila de alta prioridade
+PFILA2 iterador_alta_prio; //esse ponteiro tem que ser inicializado (com CreateFila2()) em initQueues() ou ccreate(), não sei dizer qual
+//media prioridade
+PFILA2 iterador_media_prio;
+//baixa prioridade
+PFILA2 iterador_baixa_prio;
 
 int initialized = 0;
 int serialId;
@@ -82,6 +92,30 @@ int csetprio(int tid, int prio) {
 }
 
 int cyield(void) {
+	
+	//salva o contexto atual da thread e muda o estado para apto
+	runningThread->state = PROCST_APTO;
+	getcontext(runningThread->context);
+	
+	//coloca o processo atual na fila de aptos
+	if(runningThread->prio=ALTA_PRIORIDADE){
+		//cria um novo nodo na fila;
+		NODE2 novo_elemento = malloc(sizeof(NODE2));
+		// adiciona o processo atual ao nodo
+		novo_elemento.next = *runningThread;
+		
+		//coloca o novo nodo no ultimo lugar da fila
+		AppendFila2(iterador_alta_prio, &novo_elemento);
+		
+		
+		
+		
+		
+	}	
+	
+	
+	
+	
 	return -1;
 }
 
