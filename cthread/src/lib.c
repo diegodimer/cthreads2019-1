@@ -78,6 +78,12 @@ void initQueues()
 	if (CreateFila2(pfilaTerminado) != 0)
 		printf("Erro criando fila Terminado!");
 
+	FirstFila2(pfilaAptoAlta);
+	FirstFila2(pfilaAptoMedia);
+	FirstFila2(pfilaAptoBaixa);
+	FirstFila2(pfilaBloqueado);
+	FirstFila2(pfilaTerminado);
+
 	//main thread: alocação dela
 	mainThread = malloc(sizeof(TCB_t));
 	mainThread->tid = 0;				 // thread main tem o tid = 0
