@@ -27,6 +27,9 @@ typedef struct s_TCB {
 	/* A PARTIR DESSE PONTO PODEM SER ACRESCENTADOS CAMPOS NECESS�RIOS AO DESENVOLVIMENTO DA BIBLIOTECA
 	*/
 	
+	//não é necessário inicializar com 0 porque ela passa pelo scheduler antes de ser executada pela primeira vez
+	int onyield;
+	
 } TCB_t; 
 
 

@@ -143,24 +143,43 @@ int csetprio(int tid, int prio)
 
 int cyield(void)
 {
-
-	//salva o contexto atual da thread e muda o estado para apto
+	
+	//muda o estado para apto e coloca em uma das filas
 	runningThread->state = PROCST_APTO;
-	getcontext(runningThread->context);
 
-	//coloca o processo atual na fila de aptos
-	if (runningThread->prio = ALTA_PRIORIDADE)
+		switch(runningThread->prio)
 	{
-		//cria um novo nodo na fila;
-		NODE2 novo_elemento = malloc(sizeof(NODE2));
-		// adiciona o processo atual ao nodo
-		novo_elemento.next = *runningThread;
-
-		//coloca o novo nodo no ultimo lugar da fila
-		AppendFila2(iterador_alta_prio, &novo_elemento);
+	case BAIXA_PRIORIDADE:
+		if (AppendFila2(pfilaAptoBaixa, (void *)runningThread) != 0)
+			printf(" func yield: Erro ao inserir a thread na fila de aptos");
+			return -1;
+		break;
+	case MEDIA_PRIORIDADE:
+		if (AppendFila2(pfilaAptoMedia, (void *)runningThread) != 0)
+			printf(" func yield: Erro ao inserir a thread na fila de aptos");
+			return -1;
+		break;
+	case ALTA_PRIORIDADE:
+		if (AppendFila2(pfilaAptoAlta, (void *)runningThread) != 0)
+			printf(" func yield: Erro ao inserir a thread na fila de aptos");
+			return -1;
+		break;
 	}
+	
+	// salva o contexto na thread
+	
+	if(getcontext(&(runningThread->context))==-1){
+		printf("func yield: Erro ao salvar o contexto da thread atual");
+		return -1;
+	}
+	
+	//se a thread chamou essa função agora (isto é, não está retornando sua execução) o scheduler é chamado
+	if(runningThread->onyield)
+		scheduler();
+	
+	
 
-	return -1;
+	return 0;
 }
 
 int cjoin(int tid)
