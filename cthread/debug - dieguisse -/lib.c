@@ -1,9 +1,9 @@
-
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "../include/support.h"
-#include "../include/cthread.h"
-#include "../include/cdata.h"
+#include "support.h"
+#include "cthread.h"
+#include "cdata.h"
 #include <ucontext.h>
 
 #define ALTA_PRIORIDADE 0
@@ -20,8 +20,8 @@ TCB_t *mainThread;
 // por tirar uma thread da fila de aptos e por em execução
 ucontext_t schedulerC;
 
-//****************************//
-//			Filas			   //
+  //****************************//
+ //			Filas			   //
 //****************************//
 FILA2 filaAptoBaixa;
 FILA2 filaAptoMedia;
@@ -44,7 +44,6 @@ void scheduler()
 	printf("scheduler running");
 	// troca o processo em execução e coordena as filas
 };
-
 void initQueues()
 {
 
@@ -61,7 +60,7 @@ void initQueues()
 	pfilaAptoAlta = &filaAptoAlta;
 	if (CreateFila2(pfilaAptoAlta) != 0)
 		printf("Erro criando fila apto alta prioridade!");
-	
+
 	pfilaAptoMedia = &filaAptoMedia;
 	if (CreateFila2(pfilaAptoMedia) != 0)
 		printf("Erro criando fila AptoMedia!");
@@ -77,6 +76,12 @@ void initQueues()
 	pfilaTerminado = &filaTerminado;
 	if (CreateFila2(pfilaTerminado) != 0)
 		printf("Erro criando fila Terminado!");
+
+	FirstFila2(pfilaAptoAlta);
+	FirstFila2(pfilaAptoMedia);
+	FirstFila2(pfilaAptoBaixa);
+	FirstFila2(pfilaBloqueado);
+	FirstFila2(pfilaTerminado);
 
 	//main thread: alocação dela
 	mainThread = malloc(sizeof(TCB_t));
@@ -129,7 +134,6 @@ int ccreate(void *(*start)(void *), void *arg, int prio)
 
 	return newThread->tid;
 }
-
 int csetprio(int tid, int prio)
 {
 	return -1;
@@ -138,21 +142,6 @@ int csetprio(int tid, int prio)
 int cyield(void)
 {
 
-	//salva o contexto atual da thread e muda o estado para apto
-	runningThread->state = PROCST_APTO;
-	getcontext(runningThread->context);
-
-	//coloca o processo atual na fila de aptos
-	if (runningThread->prio = ALTA_PRIORIDADE)
-	{
-		//cria um novo nodo na fila;
-		NODE2 novo_elemento = malloc(sizeof(NODE2));
-		// adiciona o processo atual ao nodo
-		novo_elemento.next = *runningThread;
-
-		//coloca o novo nodo no ultimo lugar da fila
-		AppendFila2(iterador_alta_prio, &novo_elemento);
-	}
 
 	return -1;
 }
@@ -182,3 +171,34 @@ int cidentify(char *name, int size)
 	strncpy(name, "Sergio Cechin - 2017/1 - Teste de compilacao.", size);
 	return 0;
 }
+void* func0(void *arg) {
+	printf("Eu sou a thread ID0 imprimindo %d\n", *((int *)arg));
+	return;
+}
+
+void* func1(void *arg) {
+	printf("Eu sou a thread ID1 imprimindo %d\n", *((int *)arg));
+}
+
+int main(int argc, char *argv[]) {
+
+	int	id0, id1;
+	int i;
+
+	id0 = ccreate(func0, (void *)&i, 0);
+	id1 = ccreate(func1, (void *)&i, 0);
+
+	printf("Eu sou a main após a criação de ID0 e ID1\n");
+
+	printf("Eu sou a main voltando para terminar o programa\n");
+
+	FirstFila2(pfilaAptoAlta);
+	TCB_t *thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoAlta);
+	if(thread == NULL){
+        printf("problemas");
+	}else
+        printf("ok %d \n", thread->tid);
+//	printf("\nThread na fila tem o tid %d", thread->tid);
+
+}
+
