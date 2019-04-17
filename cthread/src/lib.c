@@ -43,6 +43,30 @@ void scheduler()
 {
 	printf("scheduler running");
 	// troca o processo em execução e coordena as filas
+	
+	//flag para indicar que a func não está mais em cyield
+	runningThread->onyield = 0;
+	
+	//tenta pegar uma thread de alguma das filas de aptos
+	if(*(pfilaAptoAlta->first) != NULL)
+		runningThread = (TCB_t *)GetAtIteratorFila2(pfilaAptoAlta);
+	else if(*(pfilaAptoMedia->first) != NULL)
+			runningThread = (TCB_t *)GetAtIteratorFila2(pfilaAptoMedia);
+		else if(*(pfilaAptoBaixa->first) != NULL)
+				runningThread = (TCB_t *)GetAtIteratorFila2(pfilaAptoBaixa);
+				else{
+					printf("não há nenhum processo disponível!");
+					return -1;
+				}
+	
+	// muda o estado para executando
+	runningThread->state = PROCST_EXEC;
+	
+	//retorna ao contexto do processo
+	setcontext(&(runningThread->context));
+	
+	return 0;
+	
 };
 
 void initQueues()
@@ -142,8 +166,9 @@ int csetprio(int tid, int prio)
 }
 
 int cyield(void)
-{
-	
+{	
+	// flag para indicar que yield foi chamada pela func
+	runningThread->onyield = 1;
 	//muda o estado para apto e coloca em uma das filas
 	runningThread->state = PROCST_APTO;
 
