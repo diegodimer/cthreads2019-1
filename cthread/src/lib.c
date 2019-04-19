@@ -42,7 +42,69 @@ int serialId;
 void scheduler()
 {
 	printf("scheduler running");
-	// troca o processo em execução e coordena as filas
+
+	// se ta vindo do cyield
+	if (runningThread->onyield)
+	{
+		// poem a thread na sua correspondente fila de aptos
+		switch (runningThread->prio)
+		{
+		case BAIXA_PRIORIDADE:
+			if (AppendFila2(pfilaAptoBaixa, (void *)runningThread) != 0)
+				printf(" func yield: Erro ao inserir a thread na fila de aptos");
+			else
+				FirstFila2(pfilaAptoBaixa);
+			break;
+		case MEDIA_PRIORIDADE:
+			if (AppendFila2(pfilaAptoMedia, (void *)runningThread) != 0)
+				printf(" func yield: Erro ao inserir a thread na fila de aptos");
+			else
+				FirstFila2(pfilaAptoMedia);
+			break;
+		case ALTA_PRIORIDADE:
+			if (AppendFila2(pfilaAptoAlta, (void *)runningThread) != 0)
+				printf(" func yield: Erro ao inserir a thread na fila de aptos");
+			else
+				FirstFila2(pfilaAptoAlta);
+			break;
+		}
+		runningThread->onyield = 0;
+	}
+	else
+	{ // até entao: se ta vindo sem yield é pq ta terminando
+		if (AppendFila2(pfilaTerminado, (void *)runningThread) != 0)
+			printf(" func scheduler: Erro ao inserir a thread na fila de terminados");
+	}
+
+	FirstFila2(pfilaAptoAlta);
+	TCB_t *thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoAlta); // thread que vai ser a proxima running
+	// tenta tirar primeiro da alta, depois media depois baixa
+	if (thread == NULL)
+	{
+		thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoMedia);
+		if (thread == NULL)
+		{
+			thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoBaixa);
+			if (thread == NULL)
+				printf("eita geovanaa");
+			else
+			{
+				DeleteAtIteratorFila2(pfilaAptoBaixa);
+			}
+		}
+		else
+		{
+			DeleteAtIteratorFila2(pfilaAptoMedia);
+		}
+	}
+	else
+	{
+		DeleteAtIteratorFila2(pfilaAptoAlta);
+	}
+
+	thread->state = PROCST_EXEC;
+	runningThread = thread;
+	setcontext(&(runningThread->context));
 };
 
 void initQueues()
@@ -61,7 +123,7 @@ void initQueues()
 	pfilaAptoAlta = &filaAptoAlta;
 	if (CreateFila2(pfilaAptoAlta) != 0)
 		printf("Erro criando fila apto alta prioridade!");
-	
+
 	pfilaAptoMedia = &filaAptoMedia;
 	if (CreateFila2(pfilaAptoMedia) != 0)
 		printf("Erro criando fila AptoMedia!");
@@ -122,14 +184,20 @@ int ccreate(void *(*start)(void *), void *arg, int prio)
 	case BAIXA_PRIORIDADE:
 		if (AppendFila2(pfilaAptoBaixa, (void *)newThread) != 0)
 			printf("Erro ao inserir a nova thread na fila de aptos");
+		else
+			FirstFila2(pfilaAptoBaixa);
 		break;
 	case MEDIA_PRIORIDADE:
 		if (AppendFila2(pfilaAptoMedia, (void *)newThread) != 0)
 			printf("Erro ao inserir a nova thread na fila de aptos");
+		else
+			FirstFila2(pfilaAptoMedia);
 		break;
 	case ALTA_PRIORIDADE:
 		if (AppendFila2(pfilaAptoAlta, (void *)newThread) != 0)
 			printf("Erro ao inserir a nova thread na fila de aptos");
+		else
+			FirstFila2(pfilaAptoAlta);
 		break;
 	}
 
@@ -143,41 +211,22 @@ int csetprio(int tid, int prio)
 
 int cyield(void)
 {
-	
+	printf("chegando na cyiled");
 	//muda o estado para apto e coloca em uma das filas
 	runningThread->state = PROCST_APTO;
+	runningThread->onyield = 1;
 
-		switch(runningThread->prio)
-	{
-	case BAIXA_PRIORIDADE:
-		if (AppendFila2(pfilaAptoBaixa, (void *)runningThread) != 0)
-			printf(" func yield: Erro ao inserir a thread na fila de aptos");
-			return -1;
-		break;
-	case MEDIA_PRIORIDADE:
-		if (AppendFila2(pfilaAptoMedia, (void *)runningThread) != 0)
-			printf(" func yield: Erro ao inserir a thread na fila de aptos");
-			return -1;
-		break;
-	case ALTA_PRIORIDADE:
-		if (AppendFila2(pfilaAptoAlta, (void *)runningThread) != 0)
-			printf(" func yield: Erro ao inserir a thread na fila de aptos");
-			return -1;
-		break;
-	}
-	
 	// salva o contexto na thread
-	
-	if(getcontext(&(runningThread->context))==-1){
+
+	if (getcontext(&(runningThread->context)) == -1)
+	{
 		printf("func yield: Erro ao salvar o contexto da thread atual");
 		return -1;
 	}
-	
+
 	//se a thread chamou essa função agora (isto é, não está retornando sua execução) o scheduler é chamado
-	if(runningThread->onyield)
+	if (runningThread->onyield)
 		scheduler();
-	
-	
 
 	return 0;
 }
