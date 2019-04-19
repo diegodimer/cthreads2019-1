@@ -39,11 +39,75 @@ PFILA2 pfilaTerminado;
 int initialized = 0;
 int serialId;
 
+
 void scheduler()
 {
 	printf("scheduler running");
-	// troca o processo em execução e coordena as filas
+
+	// se ta vindo do cyield
+	if (runningThread->onyield)
+	{
+		// poem a thread na sua correspondente fila de aptos
+		switch (runningThread->prio)
+		{
+		case BAIXA_PRIORIDADE:
+			if (AppendFila2(pfilaAptoBaixa, (void *)runningThread) != 0)
+				printf(" func yield: Erro ao inserir a thread na fila de aptos");
+			else
+				FirstFila2(pfilaAptoBaixa);
+			break;
+		case MEDIA_PRIORIDADE:
+			if (AppendFila2(pfilaAptoMedia, (void *)runningThread) != 0)
+				printf(" func yield: Erro ao inserir a thread na fila de aptos");
+			else
+				FirstFila2(pfilaAptoMedia);
+			break;
+		case ALTA_PRIORIDADE:
+			if (AppendFila2(pfilaAptoAlta, (void *)runningThread) != 0)
+				printf(" func yield: Erro ao inserir a thread na fila de aptos");
+			else
+				FirstFila2(pfilaAptoAlta);
+			break;
+		}
+		runningThread->onyield = 0;
+	}
+	else
+	{ // até entao: se ta vindo sem yield é pq ta terminando
+		if (AppendFila2(pfilaTerminado, (void *)runningThread) != 0)
+			printf(" func scheduler: Erro ao inserir a thread na fila de terminados");
+	}
+
+	FirstFila2(pfilaAptoAlta);
+	TCB_t *thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoAlta); // thread que vai ser a proxima running
+	// tenta tirar primeiro da alta, depois media depois baixa
+	if (thread == NULL)
+	{
+		thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoMedia);
+		if (thread == NULL)
+		{
+			thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoBaixa);
+			if (thread == NULL)
+				printf("eita geovanaa");
+			else
+			{
+				DeleteAtIteratorFila2(pfilaAptoBaixa);
+			}
+		}
+		else
+		{
+			DeleteAtIteratorFila2(pfilaAptoMedia);
+		}
+	}
+	else
+	{
+		DeleteAtIteratorFila2(pfilaAptoAlta);
+	}
+
+	thread->state = PROCST_EXEC;
+	runningThread = thread;
+	setcontext(&(runningThread->context));
 };
+
 void initQueues()
 {
 
@@ -121,19 +185,26 @@ int ccreate(void *(*start)(void *), void *arg, int prio)
 	case BAIXA_PRIORIDADE:
 		if (AppendFila2(pfilaAptoBaixa, (void *)newThread) != 0)
 			printf("Erro ao inserir a nova thread na fila de aptos");
+		else
+			FirstFila2(pfilaAptoBaixa);
 		break;
 	case MEDIA_PRIORIDADE:
 		if (AppendFila2(pfilaAptoMedia, (void *)newThread) != 0)
 			printf("Erro ao inserir a nova thread na fila de aptos");
+		else
+			FirstFila2(pfilaAptoMedia);
 		break;
 	case ALTA_PRIORIDADE:
 		if (AppendFila2(pfilaAptoAlta, (void *)newThread) != 0)
 			printf("Erro ao inserir a nova thread na fila de aptos");
+		else
+			FirstFila2(pfilaAptoAlta);
 		break;
 	}
 
 	return newThread->tid;
 }
+
 int csetprio(int tid, int prio)
 {
 	return -1;
@@ -141,36 +212,33 @@ int csetprio(int tid, int prio)
 
 int cyield(void)
 {
+	printf("chegando na cyiled");
+	//muda o estado para apto e coloca em uma das filas
+	runningThread->state = PROCST_APTO;
+	runningThread->onyield = 1;
 
+	// salva o contexto na thread
 
-	return -1;
-}
+	if (getcontext(&(runningThread->context)) == -1)
+	{
+		printf("func yield: Erro ao salvar o contexto da thread atual");
+		return -1;
+	}
 
-int cjoin(int tid)
-{
-	return -1;
-}
+	//se a thread chamou essa função agora (isto é, não está retornando sua execução) o scheduler é chamado
+	if (runningThread->onyield)
+		scheduler();
 
-int csem_init(csem_t *sem, int count)
-{
-	return -1;
-}
-
-int cwait(csem_t *sem)
-{
-	return -1;
-}
-
-int csignal(csem_t *sem)
-{
-	return -1;
-}
-
-int cidentify(char *name, int size)
-{
-	strncpy(name, "Sergio Cechin - 2017/1 - Teste de compilacao.", size);
 	return 0;
 }
+
+
+
+
+
+
+
+
 void* func0(void *arg) {
 	printf("Eu sou a thread ID0 imprimindo %d\n", *((int *)arg));
 	return;
@@ -189,16 +257,12 @@ int main(int argc, char *argv[]) {
 	id1 = ccreate(func1, (void *)&i, 0);
 
 	printf("Eu sou a main após a criação de ID0 e ID1\n");
-
+    cyield();
 	printf("Eu sou a main voltando para terminar o programa\n");
 
-	FirstFila2(pfilaAptoAlta);
-	TCB_t *thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoAlta);
-	if(thread == NULL){
-        printf("problemas");
-	}else
-        printf("ok %d \n", thread->tid);
 //	printf("\nThread na fila tem o tid %d", thread->tid);
+
+
 
 }
 
