@@ -10,6 +10,10 @@
 #define MEDIA_PRIORIDADE 1
 #define BAIXA_PRIORIDADE 2
 
+#define FROM_END 0;
+#define FROM_YIELD 1;
+#define FROM_JOIN 2;
+
 // essa é a thread que está em execução no momento
 TCB_t *runningThread;
 
@@ -44,7 +48,7 @@ void scheduler()
 	printf("scheduler running");
 
 	// se ta vindo do cyield
-	if (runningThread->onyield)
+	if (runningThread->whereFrom == FROM_YIELD)
 	{
 		// poem a thread na sua correspondente fila de aptos
 		switch (runningThread->prio)
@@ -68,15 +72,24 @@ void scheduler()
 				FirstFila2(pfilaAptoAlta);
 			break;
 		}
-		runningThread->onyield = 0;
+		runningThread->whereFrom = FROM_END;
 	}
-	else
+	else if(runningThread->whereFrom == FROM_END)
 	{ // até entao: se ta vindo sem yield é pq ta terminando
 		if (AppendFila2(pfilaTerminado, (void *)runningThread) != 0)
 			printf(" func scheduler: Erro ao inserir a thread na fila de terminados");
+	} else if(runningThread->whereFrom == FROM_JOIN){
+		// veio do join: poem a thread em bloqueado
+		if (AppendFila2(pfilaBloqueado, (void *)runningThread) != 0)
+			printf(" func scheduler: Erro ao inserir a thread na fila de bloqueados");
+
+		// procurar nos bloqueados quem ta com o tid == runningThread -> isWaitingMe
+		// por essa thread na sua respective fila de aptos
+
+		runningThread->whereFrom = FROM_END;
 	}
 
-	FirstFila2(pfilaAptoAlta);
+
 	TCB_t *thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoAlta); // thread que vai ser a proxima running
 	// tenta tirar primeiro da alta, depois media depois baixa
 	if (thread == NULL)
@@ -177,9 +190,11 @@ int ccreate(void *(*start)(void *), void *arg, int prio)
 	newThread->context.uc_stack.ss_sp = malloc(sizeof(SIGSTKSZ));
 	newThread->context.uc_stack.ss_size = SIGSTKSZ;
 
+	newThread->whereFrom = FROM_END;
+
 	//cria um contexto, passas a função start (parametro da ccreate), é 1 parametro pra ela que tá em arg
 	makecontext(&(newThread->context), (void (*)(void))start, 1, arg);
-
+	
 	//append na fila de aptos
 	switch (prio)
 	{
@@ -217,7 +232,7 @@ int cyield(void)
 
 	//muda o estado para apto e coloca em uma das filas
 	runningThread->state = PROCST_APTO;
-	runningThread->onyield = 1;
+	runningThread->whereFrom = FROM_YIELD;
 
 	// salva o contexto na thread
 
@@ -228,7 +243,7 @@ int cyield(void)
 	}
 
 	//se a thread chamou essa função agora (isto é, não está retornando sua execução) o scheduler é chamado
-	if (runningThread->onyield)
+	if (runningThread->whereFrom == FROM_YIELD)
 		scheduler();
 
 	return 0;
@@ -236,6 +251,12 @@ int cyield(void)
 
 int cjoin(int tid)
 {
+	// procurar em todas as filas uma thread com a thread->tid = tid
+	// se ela tiver isWaitingMe != 1, retorna código de erro (já tem uma thread esperando ela)
+	// se não, poem a runningThread na fila de bloqueados, thread->isWaitingMe = runningThread->tid
+	
+	
+	
 	return -1;
 }
 
