@@ -229,6 +229,6 @@ int csignal(csem_t *sem)
 
 int cidentify(char *name, int size)
 {
-	strncpy(name, "Sergio Cechin - 2017/1 - Teste de compilacao.", size);
+	strncpy(name, "Afonso Ferrer - 252856\nDiego Dimer - 287690\nEduardo Paim - 277322 ", size);
 	return 0;
 }
