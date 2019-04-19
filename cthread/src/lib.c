@@ -105,6 +105,8 @@ void scheduler()
 	thread->state = PROCST_EXEC;
 	runningThread = thread;
 	setcontext(&(runningThread->context));
+
+
 };
 
 void initQueues()
@@ -212,6 +214,7 @@ int csetprio(int tid, int prio)
 int cyield(void)
 {
 	printf("chegando na cyiled");
+
 	//muda o estado para apto e coloca em uma das filas
 	runningThread->state = PROCST_APTO;
 	runningThread->onyield = 1;
