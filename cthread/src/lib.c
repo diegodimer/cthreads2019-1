@@ -14,6 +14,15 @@
 #define FROM_YIELD 1;
 #define FROM_JOIN 2;
 
+// cwait
+#define ERROR_NULL_PARAM -1
+#define ERROR_CANT_BLOCK_THREAD -2
+
+// cidentify
+#define ERROR_MINIMUM_SIZE_NOT_ENOUGH -1
+#define MINIMUM_STRING_SIZE 69
+#define SUCCESS 0
+
 // essa é a thread que está em execução no momento
 TCB_t *runningThread;
 
@@ -277,6 +286,10 @@ int csignal(csem_t *sem)
 
 int cidentify(char *name, int size)
 {
-	strncpy(name, "Afonso Ferrer - 252856\nDiego Dimer - 287690\nEduardo Paim - 277322 ", size);
-	return 0;
+	if (size < MINIMUM_STRING_SIZE) {
+		return ERROR_MINIMUM_SIZE_NOT_ENOUGH;
+	}
+
+	strncpy(name, "Afonso Ferrer - 252856\nDiego Dimer - 287690\nEduardo Paim - 277322", size);
+	return SUCCESS;
 }
