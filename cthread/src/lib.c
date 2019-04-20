@@ -367,7 +367,6 @@ int cjoin(int tid)
                 while (!NextFila2(pfilaBloqueado) && !found);
                 if (!found)
                 {
-                    free(toBeWaited);
                     // nao achou nao tem
                     retorno= -1;
                 }
