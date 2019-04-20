@@ -28,6 +28,8 @@ typedef struct s_TCB {
 	*/
 
 	int whereFrom;
+	// tid da thread que está esperando essa thread acabar (função cjoin)
+	int isWaitingMe;
 
 } TCB_t;
 
