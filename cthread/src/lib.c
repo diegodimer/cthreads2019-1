@@ -14,6 +14,13 @@
 #define FROM_YIELD 1;
 #define FROM_JOIN 2;
 
+// cwait
+#define SUCCESS 0;
+#define ERROR_NULL_PARAM -1
+#define ERROR_CANT_BLOCK_THREAD -2
+#define ERROR_CANT_APPEND_THREAD -3
+
+
 // essa é a thread que está em execução no momento
 TCB_t *runningThread;
 
@@ -267,7 +274,32 @@ int csem_init(csem_t *sem, int count)
 
 int cwait(csem_t *sem)
 {
-	return -1;
+	if(sem == NULL) {
+			return ERROR_NULL_PARAM;
+	}
+
+	int status = 0;
+
+	 if(sem->count < 0) {
+		getcontext(&(runningThread->context));
+		
+		/* 
+			status = funcao que bloqueia thread
+		*/
+
+		if(status < 0) {
+					return ERROR_CANT_BLOCK_THREAD;
+		}
+
+		status = AppendFila2(sem->fila, runningThread);
+		
+		if (status != 0) {
+			return ERROR_CANT_APPEND_THREAD;
+		}
+	}
+	
+	sem->count--;
+	return SUCCESS;	
 }
 
 int csignal(csem_t *sem)
