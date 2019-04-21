@@ -13,6 +13,7 @@
 #define FROM_END 0
 #define FROM_YIELD 1
 #define FROM_JOIN 2
+#define FROM_CWAIT 3
 
 // cidentify
 #define ERROR_MINIMUM_SIZE_NOT_ENOUGH -1
@@ -158,6 +159,19 @@ void scheduler()
 
         }
         while (!NextFila2(pfilaBloqueado));
+    } else if (runningThread->whereFrom == FROM_CWAIT)
+    {
+
+        runningThread->state = PROCST_BLOQ;
+        // veio do cwait: poem a thread em bloqueado
+        if (AppendFila2(pfilaBloqueado, (void *)runningThread) != 0)
+            printf(" func scheduler: Erro ao inserir a thread na fila de bloqueados");
+        else
+        {
+            FirstFila2(pfilaBloqueado);
+        }
+        // faz com que quando o contexto da thread voltar ela não caia no scheduler
+        runningThread->whereFrom = FROM_END;
     }
 
     // o que acontece pra todas -> seleciona uma da fila de aptos (da maior prioridade possivel)
@@ -430,27 +444,22 @@ int csem_init(csem_t *sem, int count)
 int cwait(csem_t *sem)
 {
 	if(sem == NULL) {
-			return ERROR_NULL_PARAM;
+		return ERROR_NULL_PARAM;
 	}
 
 	int status = 0;
 
 	 if(sem->count < 0) {
 		getcontext(&(runningThread->context));
-		
-		/* 
-			status = funcao que bloqueia thread
-		*/
-
-		if(status < 0) {
-					return ERROR_CANT_BLOCK_THREAD;
-		}
 
 		status = AppendFila2(sem->fila, runningThread);
 		
 		if (status != 0) {
 			return ERROR_CANT_APPEND_THREAD;
 		}
+
+		runningThread->whereFrom = FROM_CWAIT;
+		scheduler();
 	}
 	
 	sem->count--;
