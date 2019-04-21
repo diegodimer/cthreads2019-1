@@ -55,7 +55,6 @@ PFILA2 pfilaTerminado;
 int initialized = 0;
 int serialId;
 
-
 void setIteratorToFirst()
 {
 	FirstFila2(pfilaAptoAlta);
@@ -66,132 +65,138 @@ void setIteratorToFirst()
 
 void scheduler()
 {
-	setIteratorToFirst();
-	// se ta vindo do cyield
+	// seta iteradores das filas pra primeiro
+    setIteratorToFirst();
+    
+    if (runningThread->whereFrom == FROM_YIELD)
+    {
+        // se veio da cyield -> thread volta pra sua fila de aptos
+        runningThread->state = PROCST_APTO;
+        switch (runningThread->prio)
+        {
+        case BAIXA_PRIORIDADE:
+            if (AppendFila2(pfilaAptoBaixa, (void *)runningThread) != 0)
+                printf(" func yield: Erro ao inserir a thread na fila de aptos");
+            else
+                FirstFila2(pfilaAptoBaixa);
+            break;
+        case MEDIA_PRIORIDADE:
+            if (AppendFila2(pfilaAptoMedia, (void *)runningThread) != 0)
+                printf(" func yield: Erro ao inserir a thread na fila de aptos");
+            else
+                FirstFila2(pfilaAptoMedia);
+            break;
+        case ALTA_PRIORIDADE:
+            if (AppendFila2(pfilaAptoAlta, (void *)runningThread) != 0)
+                printf(" func yield: Erro ao inserir a thread na fila de aptos");
+            else
+                FirstFila2(pfilaAptoAlta);
+            break;
+        }
+        // faz com que quando o contexto da thread voltar ela não caia no scheduler
+        runningThread->whereFrom = FROM_END;
+    }
+    else if (runningThread->whereFrom == FROM_JOIN)
+    {
 
-	if (runningThread->whereFrom == FROM_YIELD)
-	{
-		// poem a thread na sua correspondente fila de aptos
-		runningThread->state = PROCST_APTO;
-		switch (runningThread->prio)
-		{
-		case BAIXA_PRIORIDADE:
-			if (AppendFila2(pfilaAptoBaixa, (void *)runningThread) != 0)
-				printf(" func yield: Erro ao inserir a thread na fila de aptos");
-			else
-				FirstFila2(pfilaAptoBaixa);
-			break;
-		case MEDIA_PRIORIDADE:
-			if (AppendFila2(pfilaAptoMedia, (void *)runningThread) != 0)
-				printf(" func yield: Erro ao inserir a thread na fila de aptos");
-			else
-				FirstFila2(pfilaAptoMedia);
-			break;
-		case ALTA_PRIORIDADE:
-			if (AppendFila2(pfilaAptoAlta, (void *)runningThread) != 0)
-				printf(" func yield: Erro ao inserir a thread na fila de aptos");
-			else
-				FirstFila2(pfilaAptoAlta);
-			break;
-		}
-	}
-	else if (runningThread->whereFrom == FROM_JOIN)
-	{
+        runningThread->state = PROCST_BLOQ;
+        // veio do join: poem a thread em bloqueado
+        if (AppendFila2(pfilaBloqueado, (void *)runningThread) != 0)
+            printf(" func scheduler: Erro ao inserir a thread na fila de bloqueados");
+        else
+        {
+            FirstFila2(pfilaBloqueado);
+        }
+        // faz com que quando o contexto da thread voltar ela não caia no scheduler
+        runningThread->whereFrom = FROM_END;
+    }
+    else if (runningThread->whereFrom == FROM_END)
+    {
+        // se não veio pelo yield nem join, é pq ta terminando
+        //poem na fila de terminados
+        runningThread->state = PROCST_TERMINO;
+        if (AppendFila2(pfilaTerminado, (void *)runningThread) != 0)
+            printf(" func scheduler: Erro ao inserir a thread na fila de terminados");
 
-		runningThread->state = PROCST_BLOQ;
-		// veio do join: poem a thread em bloqueado
-		if (AppendFila2(pfilaBloqueado, (void *)runningThread) != 0)
-			printf(" func scheduler: Erro ao inserir a thread na fila de bloqueados");
-		else
-		{
-			FirstFila2(pfilaBloqueado);
-		}
-	} else if (runningThread->whereFrom == FROM_END)
-	{
-		//printf("thread %d terminando\n", runningThread->tid);
-		// se não veio pelo yield nem join, é pq ta terminando
-		//poem na fila de terminados
-		runningThread->state = PROCST_TERMINO;
-		if (AppendFila2(pfilaTerminado, (void *)runningThread) != 0)
-			printf(" func scheduler: Erro ao inserir a thread na fila de terminados");
+		// desbloqueia todas threads que estavam esperando a runninghtread terminar
+        TCB_t *blockedThread;
 
-		TCB_t *blockedThread;
+        do
+        {
 
-		do
-		{
+            blockedThread = (TCB_t *)GetAtIteratorFila2(pfilaBloqueado);
 
-			blockedThread = (TCB_t *)GetAtIteratorFila2(pfilaBloqueado);
+            if (blockedThread != NULL && blockedThread->tid == runningThread->isWaitingMe) // se a thread bloqueada esta esperando pela running
+            {
 
-			if (blockedThread != NULL && blockedThread->tid == runningThread->isWaitingMe) // se a thread bloqueada esta esperando pela running
-			{
+                blockedThread->state = PROCST_APTO;
 
-				blockedThread->state = PROCST_APTO;
-				switch (blockedThread->prio)
-				{
-				case BAIXA_PRIORIDADE:
-					if (AppendFila2(pfilaAptoBaixa, (void *)blockedThread) != 0)
-						printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos");
-					else
-						FirstFila2(pfilaAptoBaixa);
-					break;
-				case MEDIA_PRIORIDADE:
-					if (AppendFila2(pfilaAptoMedia, (void *)blockedThread) != 0)
-						printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos");
-					else
-						FirstFila2(pfilaAptoMedia);
-					break;
-				case ALTA_PRIORIDADE:
-					if (AppendFila2(pfilaAptoAlta, (void *)blockedThread) != 0)
-						printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos");
-					else
-						FirstFila2(pfilaAptoAlta);
-					break;
-				}
-				DeleteAtIteratorFila2(pfilaBloqueado);
-				FirstFila2(pfilaBloqueado);
-			}
+                switch (blockedThread->prio)
+                {
+                case BAIXA_PRIORIDADE:
+                    if (AppendFila2(pfilaAptoBaixa, (void *)blockedThread) != 0)
+                        printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos");
+                    else
+                        FirstFila2(pfilaAptoBaixa);
+                    break;
+                case MEDIA_PRIORIDADE:
+                    if (AppendFila2(pfilaAptoMedia, (void *)blockedThread) != 0)
+                        printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos");
+                    else
+                        FirstFila2(pfilaAptoMedia);
+                    break;
+                case ALTA_PRIORIDADE:
+                    if (AppendFila2(pfilaAptoAlta, (void *)blockedThread) != 0)
+                        printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos");
+                    else
+                        FirstFila2(pfilaAptoAlta);
+                    break;
+                }
+                DeleteAtIteratorFila2(pfilaBloqueado);
+                FirstFila2(pfilaBloqueado);
+            }
 
-		} while (!NextFila2(pfilaBloqueado));
-	}
+        }
+        while (!NextFila2(pfilaBloqueado));
+    }
 
-	// o que acontece pra todas -> seleciona uma da fila de aptos (da maior prioridade possivel)
-	// tira ela (delete) e atualiza a runningthread;
+    // o que acontece pra todas -> seleciona uma da fila de aptos (da maior prioridade possivel)
+    // tira ela (delete) e atualiza a runningthread;
 
-	TCB_t *thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoAlta); // thread que vai ser a proxima running
+    TCB_t *thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoAlta); // thread que vai ser a proxima running
 
-	// tenta tirar primeiro da alta, depois media depois baixa
-	if (thread == NULL)
-	{
-		thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoMedia);
-		if (thread == NULL)
-		{
-			thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoBaixa);
-			if (thread == NULL)
-				printf("eita geovanaa");
-			else
-			{
-				DeleteAtIteratorFila2(pfilaAptoBaixa);
-			}
-		}
-		else
-		{
-			DeleteAtIteratorFila2(pfilaAptoMedia);
-		}
-	}
-	else
-	{
-		DeleteAtIteratorFila2(pfilaAptoAlta);
-	}
+    // tenta tirar primeiro da alta, depois media depois baixa
+    if (thread == NULL)
+    {
+        thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoMedia);
+        if (thread == NULL)
+        {
+            thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoBaixa);
+            if (thread == NULL)
+                printf("eita geovanaa");
+            else
+            {
+                DeleteAtIteratorFila2(pfilaAptoBaixa);
+            }
+        }
+        else
+        {
+            DeleteAtIteratorFila2(pfilaAptoMedia);
+        }
+    }
+    else
+    {
+        DeleteAtIteratorFila2(pfilaAptoAlta);
+    }
 
-	thread->state = PROCST_EXEC;
-	runningThread = thread;
+    thread->state = PROCST_EXEC;
+    runningThread = thread;
 
-	// seta que a thread vai vir do end na proxima (pra cwait e cyield nao cairem no scheduler de novo)
-	runningThread->whereFrom = FROM_END;
-
-	// passa por todas as bloqueadas ve se tem alguem esperando por a thread que terminou
-	setcontext(&(runningThread->context));
+    // seta o contexto pra thread que está pra rodar
+    setcontext(&(runningThread->context));
 };
+
+
 
 void initQueues()
 {
@@ -293,7 +298,13 @@ int ccreate(void *(*start)(void *), void *arg, int prio)
 
 int csetprio(int tid, int prio)
 {
-	return -1;
+	if (tid != NULL || prio > BAIXA_PRIORIDADE || prio < ALTA_PRIORIDADE)
+		return -1;
+	else
+	{
+		runningThread->prio = prio;
+		return 0;
+	}
 }
 
 int cyield(void)
@@ -321,99 +332,95 @@ int cyield(void)
 
 int cjoin(int tid)
 {
-    int retorno;
-    // procurar em todas as filas uma thread com a thread->tid = tid
-    // se ela tiver isWaitingMe != 1, retorna código de erro (já tem uma thread esperando ela)
-    // se não, poem a runningThread na fila de bloqueados, thread->isWaitingMe = runningThread->tid
+	int retorno;
+	
+	//procura a thread com tid
+	TCB_t *toBeWaited;
 
-    //procura a thread com tid
-    TCB_t *toBeWaited;
+	setIteratorToFirst();
 
-    setIteratorToFirst();
+	int found = 0;
 
-    int found = 0;
+	do
+	{
+		toBeWaited = (TCB_t *)GetAtIteratorFila2(pfilaAptoAlta);
+		if (toBeWaited != NULL && toBeWaited->tid == tid)
+		{
+			found = 1;
+		}
+	} while (!NextFila2(pfilaAptoAlta) && !found);
+	if (!found)
+	{
+		// nao achou > proxima fila
+		do
+		{
+			toBeWaited = (TCB_t *)GetAtIteratorFila2(pfilaAptoMedia);
+			if (toBeWaited != NULL && toBeWaited->tid == tid)
+			{
+				found = 1;
+			}
+		} while (!NextFila2(pfilaAptoMedia) && !found);
+		if (!found)
+		{
+			// nao achou > proxima fila
+			do
+			{
+				toBeWaited = (TCB_t *)GetAtIteratorFila2(pfilaAptoBaixa);
+				if (toBeWaited != NULL && toBeWaited->tid == tid)
+				{
+					found = 1;
+				}
+			} while (!NextFila2(pfilaAptoBaixa) && !found);
+			if (!found)
+			{
+				do
+				{
+					toBeWaited = (TCB_t *)GetAtIteratorFila2(pfilaBloqueado);
+					if (toBeWaited != NULL && toBeWaited->tid == tid)
+					{
+						found = 1;
+					}
+				} while (!NextFila2(pfilaBloqueado) && !found);
+				if (!found)
+				{
+					// nao achou nao tem
+					retorno = -1;
+				}
+			}
+		}
+	}
 
-    do
-    {
-        toBeWaited = (TCB_t *)GetAtIteratorFila2(pfilaAptoAlta);
-        if (toBeWaited != NULL && toBeWaited->tid == tid)
-        {
-            found = 1;
-        }
-    }
-    while (!NextFila2(pfilaAptoAlta) && !found);
-    if (!found)
-    {
-        // nao achou > proxima fila
-        do
-        {
-            toBeWaited = (TCB_t *)GetAtIteratorFila2(pfilaAptoMedia);
-            if (toBeWaited != NULL && toBeWaited->tid == tid)
-            {
-                found = 1;
-            }
-        }
-        while (!NextFila2(pfilaAptoMedia) && !found);
-        if (!found)
-        {
-            // nao achou > proxima fila
-            do
-            {
-                toBeWaited = (TCB_t *)GetAtIteratorFila2(pfilaAptoBaixa);
-                if (toBeWaited != NULL && toBeWaited->tid == tid)
-                {
-                    found = 1;
-                }
-            }
-            while (!NextFila2(pfilaAptoBaixa) && !found);
-            if (!found)
-            {
-                do
-                {
-                    toBeWaited = (TCB_t *)GetAtIteratorFila2(pfilaBloqueado);
-                    if (toBeWaited != NULL && toBeWaited->tid == tid)
-                    {
-                        found = 1;
-                    }
-                }
-                while (!NextFila2(pfilaBloqueado) && !found);
-                if (!found)
-                {
-                    // nao achou nao tem
-                    retorno= -1;
-                }
-            }
-        }
-    }
+	if (found)
+	{
+		// achou a thread com o tid buscado
+		if (toBeWaited->isWaitingMe != -1) // ja tem alguem esperando essa thread
+		{
+			retorno = -2;
+		}
+		else
+		{
+			// tudo bem pode esperar
+			// agora a runningthread ta esperando a thread acabar
+			toBeWaited->isWaitingMe = runningThread->tid;
+			// ela vai cair no if pra fazer o scheduler e quando voltar não vai (ja fez)
+			runningThread->whereFrom = FROM_JOIN;
+			// salva o contexto da thread que ta rodando (ela vai ser bloqueada)
+			getcontext(&(runningThread->context));
+			//quando a execução dela voltar ela volta aqui, mas ja passou pelo scheduler
+			// que mudou o whereFrom dela
+			if ((runningThread->whereFrom) == FROM_JOIN)
+			{
+				scheduler();
+			}
+			else
+			{
+				retorno = 0;
+			}
+		}
+	}
 
-    if (found)
-    {
-        // achou a thread com o tid buscado
-        if (toBeWaited->isWaitingMe != -1) // ja tem alguem esperando essa thread
-        {
-            retorno = -2;
-        }
-        else
-        {
-            // tudo bem pode esperar
-            // agora a runningthread ta esperando a thread acabar
-            toBeWaited->isWaitingMe = runningThread->tid;
-            runningThread->whereFrom = FROM_JOIN;
-            // salva o contexto da thread que ta rodando (ela vai ser bloqueada)
-            getcontext(&(runningThread->context));
-            //quando a execução dela voltar ela volta aqui, mas ja passou pelo scheduler
-            // que mudou o whereFrom dela
-            if ( (runningThread->whereFrom) == FROM_JOIN)
-            {
-                scheduler();
-            }
-            retorno= 0;
-        }
-    }
-
-    return retorno;
+	return retorno;
 }
-
 
 int csem_init(csem_t *sem, int count)
 {
@@ -458,11 +465,11 @@ int csignal(csem_t *sem)
 int cidentify(char *name, int size)
 {
 
-	if (size < MINIMUM_STRING_SIZE) {
+	if (size < MINIMUM_STRING_SIZE)
+	{
 		return ERROR_MINIMUM_SIZE_NOT_ENOUGH;
 	}
 
 	strncpy(name, "Afonso Ferrer - 252856\nDiego Dimer - 287690\nEduardo Paim - 277322", size);
 	return SUCCESS;
 }
-
