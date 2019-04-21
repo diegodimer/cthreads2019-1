@@ -26,7 +26,8 @@ typedef struct s_TCB {
 
 	/* A PARTIR DESSE PONTO PODEM SER ACRESCENTADOS CAMPOS NECESS�RIOS AO DESENVOLVIMENTO DA BIBLIOTECA
 	*/
-	int onyield;
+	int whereFrom;
+	int isWaitingMe;
 
 } TCB_t;
 
