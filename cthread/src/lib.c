@@ -290,7 +290,14 @@ int ccreate(void *(*start)(void *), void *arg, int prio)
 
 int csetprio(int tid, int prio)
 {
-	return -1;
+	if(tid != NULL || prio > BAIXA_PRIORIDADE || prio < ALTA_PRIORIDADE)
+		return -1;
+	else
+	{
+		runningThread->prio = prio;
+		return 0;
+	}
+	
 }
 
 int cyield(void)
