@@ -1,21 +1,20 @@
-#include <stdlib.h>
+
 #include <stdio.h>
 #include <string.h>
 #include "../include/support.h"
 #include "../include/cthread.h"
 #include "../include/cdata.h"
 #include <ucontext.h>
+#include <stdlib.h>
 
+#define ALTA_PRIORIDADE 0
+#define MEDIA_PRIORIDADE 1
+#define BAIXA_PRIORIDADE 2
 
 #define FROM_END 0
 #define FROM_YIELD 1
 #define FROM_JOIN 2
 
-
-#define ALTA_PRIORIDADE 0
-#define MEDIA_PRIORIDADE 1
-#define BAIXA_PRIORIDADE 2
-int	id0, id1, id2,id3, id4;
 // essa é a thread que está em execução no momento
 TCB_t *runningThread;
 
@@ -48,263 +47,270 @@ int serialId;
 
 void setIteratorToFirst()
 {
-	FirstFila2(pfilaAptoAlta);
-	FirstFila2(pfilaAptoMedia);
-	FirstFila2(pfilaAptoBaixa);
-	FirstFila2(pfilaBloqueado);
+    FirstFila2(pfilaAptoAlta);
+    FirstFila2(pfilaAptoMedia);
+    FirstFila2(pfilaAptoBaixa);
+    FirstFila2(pfilaBloqueado);
 };
 
 void scheduler()
 {
-	setIteratorToFirst();
-	// se ta vindo do cyield
+	// seta iteradores das filas pra primeiro
+    setIteratorToFirst();
 
-	if (runningThread->whereFrom == FROM_YIELD)
-	{
-		// poem a thread na sua correspondente fila de aptos
-		runningThread->state = PROCST_APTO;
-		switch (runningThread->prio)
-		{
-		case BAIXA_PRIORIDADE:
-			if (AppendFila2(pfilaAptoBaixa, (void *)runningThread) != 0)
-				printf(" func yield: Erro ao inserir a thread na fila de aptos");
-			else
-				FirstFila2(pfilaAptoBaixa);
-			break;
-		case MEDIA_PRIORIDADE:
-			if (AppendFila2(pfilaAptoMedia, (void *)runningThread) != 0)
-				printf(" func yield: Erro ao inserir a thread na fila de aptos");
-			else
-				FirstFila2(pfilaAptoMedia);
-			break;
-		case ALTA_PRIORIDADE:
-			if (AppendFila2(pfilaAptoAlta, (void *)runningThread) != 0)
-				printf(" func yield: Erro ao inserir a thread na fila de aptos");
-			else
-				FirstFila2(pfilaAptoAlta);
-			break;
-		}
-	}
-	else if (runningThread->whereFrom == FROM_JOIN)
-	{
+    if (runningThread->whereFrom == FROM_YIELD)
+    {
+        // se veio da cyield -> thread volta pra sua fila de aptos
+        runningThread->state = PROCST_APTO;
+        switch (runningThread->prio)
+        {
+        case BAIXA_PRIORIDADE:
+            if (AppendFila2(pfilaAptoBaixa, (void *)runningThread) != 0)
+                printf(" func yield: Erro ao inserir a thread na fila de aptos");
+            else
+                FirstFila2(pfilaAptoBaixa);
+            break;
+        case MEDIA_PRIORIDADE:
+            if (AppendFila2(pfilaAptoMedia, (void *)runningThread) != 0)
+                printf(" func yield: Erro ao inserir a thread na fila de aptos");
+            else
+                FirstFila2(pfilaAptoMedia);
+            break;
+        case ALTA_PRIORIDADE:
+            if (AppendFila2(pfilaAptoAlta, (void *)runningThread) != 0)
+                printf(" func yield: Erro ao inserir a thread na fila de aptos");
+            else
+                FirstFila2(pfilaAptoAlta);
+            break;
+        }
+        // faz com que quando o contexto da thread voltar ela não caia no scheduler
+        runningThread->whereFrom = FROM_END;
+    }
+    else if (runningThread->whereFrom == FROM_JOIN)
+    {
 
-		runningThread->state = PROCST_BLOQ;
-		// veio do join: poem a thread em bloqueado
-		if (AppendFila2(pfilaBloqueado, (void *)runningThread) != 0)
-			printf(" func scheduler: Erro ao inserir a thread na fila de bloqueados");
-		else
-		{
-			FirstFila2(pfilaBloqueado);
-		}
-	} else if (runningThread->whereFrom == FROM_END)
-	{
-		//printf("thread %d terminando\n", runningThread->tid);
-		// se não veio pelo yield nem join, é pq ta terminando
-		//poem na fila de terminados
-		runningThread->state = PROCST_TERMINO;
-		if (AppendFila2(pfilaTerminado, (void *)runningThread) != 0)
-			printf(" func scheduler: Erro ao inserir a thread na fila de terminados");
+        runningThread->state = PROCST_BLOQ;
+        // veio do join: poem a thread em bloqueado
+        if (AppendFila2(pfilaBloqueado, (void *)runningThread) != 0)
+            printf(" func scheduler: Erro ao inserir a thread na fila de bloqueados");
+        else
+        {
+            FirstFila2(pfilaBloqueado);
+        }
+        // faz com que quando o contexto da thread voltar ela não caia no scheduler
+        runningThread->whereFrom = FROM_END;
+    }
+    else if (runningThread->whereFrom == FROM_END)
+    {
+        // se não veio pelo yield nem join, é pq ta terminando
+        //poem na fila de terminados
+        runningThread->state = PROCST_TERMINO;
+        if (AppendFila2(pfilaTerminado, (void *)runningThread) != 0)
+            printf(" func scheduler: Erro ao inserir a thread na fila de terminados");
 
-		TCB_t *blockedThread;
+		// desbloqueia todas threads que estavam esperando a runninghtread terminar
+        TCB_t *blockedThread;
 
-		do
-		{
+        do
+        {
 
-			blockedThread = (TCB_t *)GetAtIteratorFila2(pfilaBloqueado);
+            blockedThread = (TCB_t *)GetAtIteratorFila2(pfilaBloqueado);
 
-			if (blockedThread != NULL && blockedThread->tid == runningThread->isWaitingMe) // se a thread bloqueada esta esperando pela running
-			{
+            if (blockedThread != NULL && blockedThread->tid == runningThread->isWaitingMe) // se a thread bloqueada esta esperando pela running
+            {
 
-				blockedThread->state = PROCST_APTO;
-				switch (blockedThread->prio)
-				{
-				case BAIXA_PRIORIDADE:
-					if (AppendFila2(pfilaAptoBaixa, (void *)blockedThread) != 0)
-						printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos");
-					else
-						FirstFila2(pfilaAptoBaixa);
-					break;
-				case MEDIA_PRIORIDADE:
-					if (AppendFila2(pfilaAptoMedia, (void *)blockedThread) != 0)
-						printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos");
-					else
-						FirstFila2(pfilaAptoMedia);
-					break;
-				case ALTA_PRIORIDADE:
-					if (AppendFila2(pfilaAptoAlta, (void *)blockedThread) != 0)
-						printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos");
-					else
-						FirstFila2(pfilaAptoAlta);
-					break;
-				}
-				DeleteAtIteratorFila2(pfilaBloqueado);
-				FirstFila2(pfilaBloqueado);
-			}
+                blockedThread->state = PROCST_APTO;
 
-		} while (!NextFila2(pfilaBloqueado));
-	}
+                switch (blockedThread->prio)
+                {
+                case BAIXA_PRIORIDADE:
+                    if (AppendFila2(pfilaAptoBaixa, (void *)blockedThread) != 0)
+                        printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos");
+                    else
+                        FirstFila2(pfilaAptoBaixa);
+                    break;
+                case MEDIA_PRIORIDADE:
+                    if (AppendFila2(pfilaAptoMedia, (void *)blockedThread) != 0)
+                        printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos");
+                    else
+                        FirstFila2(pfilaAptoMedia);
+                    break;
+                case ALTA_PRIORIDADE:
+                    if (AppendFila2(pfilaAptoAlta, (void *)blockedThread) != 0)
+                        printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos");
+                    else
+                        FirstFila2(pfilaAptoAlta);
+                    break;
+                }
+                DeleteAtIteratorFila2(pfilaBloqueado);
+                FirstFila2(pfilaBloqueado);
+            }
 
-	// o que acontece pra todas -> seleciona uma da fila de aptos (da maior prioridade possivel)
-	// tira ela (delete) e atualiza a runningthread;
+        }
+        while (!NextFila2(pfilaBloqueado));
+    }
 
-	TCB_t *thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoAlta); // thread que vai ser a proxima running
+    // o que acontece pra todas -> seleciona uma da fila de aptos (da maior prioridade possivel)
+    // tira ela (delete) e atualiza a runningthread;
 
-	// tenta tirar primeiro da alta, depois media depois baixa
-	if (thread == NULL)
-	{
-		thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoMedia);
-		if (thread == NULL)
-		{
-			thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoBaixa);
-			if (thread == NULL)
-				printf("eita geovanaa");
-			else
-			{
-				DeleteAtIteratorFila2(pfilaAptoBaixa);
-			}
-		}
-		else
-		{
-			DeleteAtIteratorFila2(pfilaAptoMedia);
-		}
-	}
-	else
-	{
-		DeleteAtIteratorFila2(pfilaAptoAlta);
-	}
+    TCB_t *thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoAlta); // thread que vai ser a proxima running
 
-	thread->state = PROCST_EXEC;
-	runningThread = thread;
+    // tenta tirar primeiro da alta, depois media depois baixa
+    if (thread == NULL)
+    {
+        thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoMedia);
+        if (thread == NULL)
+        {
+            thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoBaixa);
+            if (thread == NULL)
+                printf("eita geovanaa");
+            else
+            {
+                DeleteAtIteratorFila2(pfilaAptoBaixa);
+            }
+        }
+        else
+        {
+            DeleteAtIteratorFila2(pfilaAptoMedia);
+        }
+    }
+    else
+    {
+        DeleteAtIteratorFila2(pfilaAptoAlta);
+    }
 
-	// seta que a thread vai vir do end na proxima (pra cwait e cyield nao cairem no scheduler de novo)
-	runningThread->whereFrom = FROM_END;
+    thread->state = PROCST_EXEC;
+    runningThread = thread;
 
-	// passa por todas as bloqueadas ve se tem alguem esperando por a thread que terminou
-	setcontext(&(runningThread->context));
+    // seta o contexto pra thread que está pra rodar
+    setcontext(&(runningThread->context));
 };
+
 
 void initQueues()
 {
 
-	initialized = 1;
-	// pega o contexto atual pra iniciar o scheduler
-	getcontext(&schedulerC);
-	schedulerC.uc_link = NULL;
-	schedulerC.uc_stack.ss_sp = (char *)malloc(sizeof(SIGSTKSZ));
-	schedulerC.uc_stack.ss_size = SIGSTKSZ;
-	// aqui não tem o problema do setcontext pq o makecontext faz o scheduler ir pra função dele
-	makecontext(&schedulerC, (void (*)(void))scheduler, 0);
+    initialized = 1;
+    // pega o contexto atual pra iniciar o scheduler
+    getcontext(&schedulerC);
+    schedulerC.uc_link = NULL;
+    schedulerC.uc_stack.ss_sp = (char *)malloc(sizeof(SIGSTKSZ));
+    schedulerC.uc_stack.ss_size = SIGSTKSZ;
+    // aqui não tem o problema do setcontext pq o makecontext faz o scheduler ir pra função dele
+    makecontext(&schedulerC, (void (*)(void))scheduler, 0);
 
-	/// inicializa as filas
-	pfilaAptoAlta = &filaAptoAlta;
-	if (CreateFila2(pfilaAptoAlta) != 0)
-		printf("Erro criando fila apto alta prioridade!");
+    /// inicializa as filas
+    pfilaAptoAlta = &filaAptoAlta;
+    if (CreateFila2(pfilaAptoAlta) != 0)
+        printf("Erro criando fila apto alta prioridade!");
 
-	pfilaAptoMedia = &filaAptoMedia;
-	if (CreateFila2(pfilaAptoMedia) != 0)
-		printf("Erro criando fila AptoMedia!");
+    pfilaAptoMedia = &filaAptoMedia;
+    if (CreateFila2(pfilaAptoMedia) != 0)
+        printf("Erro criando fila AptoMedia!");
 
-	pfilaAptoBaixa = &filaAptoBaixa;
-	if (CreateFila2(pfilaAptoBaixa) != 0)
-		printf("Erro criando fila AptoBaixa!");
+    pfilaAptoBaixa = &filaAptoBaixa;
+    if (CreateFila2(pfilaAptoBaixa) != 0)
+        printf("Erro criando fila AptoBaixa!");
 
-	pfilaBloqueado = &filaBloqueado;
-	if (CreateFila2(pfilaBloqueado) != 0)
-		printf("Erro criando fila Bloqueado!");
+    pfilaBloqueado = &filaBloqueado;
+    if (CreateFila2(pfilaBloqueado) != 0)
+        printf("Erro criando fila Bloqueado!");
 
-	pfilaTerminado = &filaTerminado;
-	if (CreateFila2(pfilaTerminado) != 0)
-		printf("Erro criando fila Terminado!");
+    pfilaTerminado = &filaTerminado;
+    if (CreateFila2(pfilaTerminado) != 0)
+        printf("Erro criando fila Terminado!");
 
-	setIteratorToFirst();
+    setIteratorToFirst();
 
-	//main thread: alocação dela
-	mainThread = malloc(sizeof(TCB_t));
-	mainThread->tid = 0;				 // thread main tem o tid = 0
-	mainThread->state = PROCST_EXEC;	 // main thread ta executando
-	mainThread->prio = BAIXA_PRIORIDADE; // main tem baixa prioridade
-	mainThread->context.uc_link = NULL;
-	mainThread->context.uc_stack.ss_size = SIGSTKSZ;
-	mainThread->context.uc_stack.ss_sp = malloc(sizeof(SIGSTKSZ));
-	mainThread->isWaitingMe = -1;
-	mainThread->whereFrom = FROM_END;
-	runningThread = mainThread;
-	getcontext(&(mainThread->context));
+    //main thread: alocação dela
+    mainThread = malloc(sizeof(TCB_t));
+    mainThread->tid = 0;				 // thread main tem o tid = 0
+    mainThread->state = PROCST_EXEC;	 // main thread ta executando
+    mainThread->prio = BAIXA_PRIORIDADE; // main tem baixa prioridade
+    mainThread->context.uc_link = NULL;
+    mainThread->context.uc_stack.ss_size = SIGSTKSZ;
+    mainThread->context.uc_stack.ss_sp = malloc(sizeof(SIGSTKSZ));
+    mainThread->isWaitingMe = -1;
+    mainThread->whereFrom = FROM_END;
+    runningThread = mainThread;
+    getcontext(&(mainThread->context));
 };
 
 int ccreate(void *(*start)(void *), void *arg, int prio)
 {
 
-	if (!initialized)
-		initQueues(); // inicializa as filas (todas)
+    if (!initialized)
+        initQueues(); // inicializa as filas (todas)
 
-	TCB_t *newThread = malloc(sizeof(TCB_t));
-	newThread->tid = ++serialId;
-	newThread->state = PROCST_APTO;
-	newThread->prio = prio;
-	getcontext(&(newThread->context)); // pega o contexto(atual) e poem no contexto da thread nova
-	// quando cada thread termina ela vai pro scheduler que daí decide qual fila por
-	newThread->context.uc_link = &schedulerC;
+    TCB_t *newThread = malloc(sizeof(TCB_t));
+    newThread->tid = ++serialId;
+    newThread->state = PROCST_APTO;
+    newThread->prio = prio;
+    getcontext(&(newThread->context)); // pega o contexto(atual) e poem no contexto da thread nova
+    // quando cada thread termina ela vai pro scheduler que daí decide qual fila por
+    newThread->context.uc_link = &schedulerC;
 
-	newThread->context.uc_stack.ss_sp = malloc(sizeof(SIGSTKSZ));
-	newThread->context.uc_stack.ss_size = SIGSTKSZ;
+    newThread->context.uc_stack.ss_sp = malloc(sizeof(SIGSTKSZ));
+    newThread->context.uc_stack.ss_size = SIGSTKSZ;
 
-	newThread->whereFrom = FROM_END;
-	newThread->isWaitingMe = -1;
+    newThread->whereFrom = FROM_END;
+    newThread->isWaitingMe = -1;
 
-	//cria um contexto, passas a função start (parametro da ccreate), é 1 parametro pra ela que tá em arg
-	makecontext(&(newThread->context), (void (*)(void))start, 1, arg);
+    //cria um contexto, passas a função start (parametro da ccreate), é 1 parametro pra ela que tá em arg
+    makecontext(&(newThread->context), (void (*)(void))start, 1, arg);
 
-	//append na fila de aptos
-	switch (prio)
-	{
-	case BAIXA_PRIORIDADE:
-		if (AppendFila2(pfilaAptoBaixa, (void *)newThread) != 0)
-			printf("Erro ao inserir a nova thread na fila de aptos");
-		else
-			FirstFila2(pfilaAptoBaixa);
-		break;
-	case MEDIA_PRIORIDADE:
-		if (AppendFila2(pfilaAptoMedia, (void *)newThread) != 0)
-			printf("Erro ao inserir a nova thread na fila de aptos");
-		else
-			FirstFila2(pfilaAptoMedia);
-		break;
-	case ALTA_PRIORIDADE:
-		if (AppendFila2(pfilaAptoAlta, (void *)newThread) != 0)
-			printf("Erro ao inserir a nova thread na fila de aptos");
-		else
-			FirstFila2(pfilaAptoAlta);
-		break;
-	}
+    //append na fila de aptos
+    switch (prio)
+    {
+    case BAIXA_PRIORIDADE:
+        if (AppendFila2(pfilaAptoBaixa, (void *)newThread) != 0)
+            printf("Erro ao inserir a nova thread na fila de aptos");
+        else
+            FirstFila2(pfilaAptoBaixa);
+        break;
+    case MEDIA_PRIORIDADE:
+        if (AppendFila2(pfilaAptoMedia, (void *)newThread) != 0)
+            printf("Erro ao inserir a nova thread na fila de aptos");
+        else
+            FirstFila2(pfilaAptoMedia);
+        break;
+    case ALTA_PRIORIDADE:
+        if (AppendFila2(pfilaAptoAlta, (void *)newThread) != 0)
+            printf("Erro ao inserir a nova thread na fila de aptos");
+        else
+            FirstFila2(pfilaAptoAlta);
+        break;
+    }
 
-	return newThread->tid;
+    return newThread->tid;
 }
 
 int csetprio(int tid, int prio)
 {
-	return -1;
+    return -1;
 }
 
 int cyield(void)
 {
-	//muda o estado para apto e coloca em uma das filas
 
-	runningThread->whereFrom = FROM_YIELD;
 
-	// salva o contexto na thread
+    //muda o estado para apto e coloca em uma das filas
 
-	if (getcontext(&(runningThread->context)) == -1)
-	{
-		printf("func yield: Erro ao salvar o contexto da thread atual");
-		return -1;
-	}
+    runningThread->whereFrom = FROM_YIELD;
 
-	//se a thread chamou essa função agora (isto é, não está retornando sua execução) o scheduler é chamado
-	if (runningThread->whereFrom == FROM_YIELD)
-		scheduler();
+    // salva o contexto na thread
 
-	return 0;
+    if (getcontext(&(runningThread->context)) == -1)
+    {
+        printf("func yield: Erro ao salvar o contexto da thread atual");
+        return -1;
+    }
+
+    //se a thread chamou essa função agora (isto é, não está retornando sua execução) o scheduler é chamado
+    if (runningThread->whereFrom == FROM_YIELD)
+        scheduler();
+
+    return 0;
 }
 
 int cjoin(int tid)
@@ -395,7 +401,10 @@ int cjoin(int tid)
             {
                 scheduler();
             }
-            retorno= 0;
+            else
+            {
+                retorno= 0;
+            }
         }
     }
 
@@ -405,52 +414,72 @@ int cjoin(int tid)
 
 int csem_init(csem_t *sem, int count)
 {
-	return -1;
+    return -1;
 }
 
 int cwait(csem_t *sem)
 {
-	return -1;
+    return -1;
 }
 
 int csignal(csem_t *sem)
 {
-	return -1;
+    return -1;
 }
 
 int cidentify(char *name, int size)
 {
-	strncpy(name, "Sergio Cechin - 2017/1 - Teste de compilacao.", size);
-	return 0;
+    strncpy(name, "Sergio Cechin - 2017/1 - Teste de compilacao.", size);
+    return 0;
 }
 
-void* func0(void *arg) {
-	printf("Eu sou a thread ID0 imprimindo %d\n", *((int *)arg));
-	int i=cjoin(3);
-	printf("retorno do cjoin(3): %d\n", i);
-}
 
-void* func1(void *arg) {
-	printf("Eu sou a thread ID1 imprimindo %d\n", *((int *)arg));
-	cjoin(3);
-	cyield();
-	printf("a\n");
-}
+int	id0, id1, id2, id3;
 
-int main(int argc, char *argv[]) {
-
-	int	id0, id1;
-	int i=0;
-
-	id0 = ccreate(func0, (void *)&i, 0);
-	id1 = ccreate(func1, (void *)&i, 0);
-
-	printf("Eu sou a main após a criação de ID0 e ID1\n");
-
-	cjoin(id0);
+void* func0(void *arg)
+{
+    printf("Eu sou a thread ID1\n");
     cjoin(id1);
-    cjoin(5);
-	printf("Eu sou a main voltando para terminar o programa\n");
+    cyield();
+    cjoin(id2);
+    cyield();
+    cjoin(id3);
+    printf("ID0 voltando pra terminar\n");
+
+}
+
+void* func1(void *arg)
+{
+    cyield();
+    printf("Eu sou a thread ID2\n");
+}
+
+void* func2(void *arg)
+{
+    printf("Eu sou a thread ID3\n");
+}
+
+void* func3(void *arg)
+{
+    printf("Eu sou a thread ID4\n");
+}
+
+int main(int argc, char *argv[])
+{
+
+
+    int i=0;
+
+    id0 = ccreate(func0, (void *)&i, 0);
+    id1 = ccreate(func1, (void *)&i, 0);
+    id2 = ccreate(func2, (void *)&i, MEDIA_PRIORIDADE);
+    id3 = ccreate(func3, (void *)&i, BAIXA_PRIORIDADE);
+
+    printf("Eu sou a main após a criação de ID0 e ID1\n");
+
+    cjoin(id0);
+
+    printf("Eu sou a main voltando para terminar o programa\n");
 }
 
 
