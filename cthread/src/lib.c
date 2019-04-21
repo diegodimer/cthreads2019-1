@@ -14,10 +14,6 @@
 #define FROM_YIELD 1
 #define FROM_JOIN 2
 
-// cwait
-#define ERROR_NULL_PARAM -1
-#define ERROR_CANT_BLOCK_THREAD -2
-
 // cidentify
 #define ERROR_MINIMUM_SIZE_NOT_ENOUGH -1
 #define MINIMUM_STRING_SIZE 69
