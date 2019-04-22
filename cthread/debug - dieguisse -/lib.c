@@ -1,11 +1,10 @@
-
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include "../include/support.h"
 #include "../include/cthread.h"
 #include "../include/cdata.h"
 #include <ucontext.h>
-#include <stdlib.h>
 
 #define ALTA_PRIORIDADE 0
 #define MEDIA_PRIORIDADE 1
@@ -14,6 +13,22 @@
 #define FROM_END 0
 #define FROM_YIELD 1
 #define FROM_JOIN 2
+#define FROM_CWAIT 3
+
+// cidentify
+#define ERROR_MINIMUM_SIZE_NOT_ENOUGH -1
+#define MINIMUM_STRING_SIZE 69
+#define SUCCESS 0
+
+// cwait
+#define SUCCESS 0;
+#define ERROR_NULL_PARAM -1
+#define ERROR_CANT_BLOCK_THREAD -2
+#define ERROR_CANT_APPEND_THREAD -3
+
+//csignal
+#define ERROR_REMOVE_THREAD -1
+#define ERROR_APPEND_THREAD -2
 
 // essa é a thread que está em execução no momento
 TCB_t *runningThread;
@@ -44,7 +59,6 @@ PFILA2 pfilaTerminado;
 int initialized = 0;
 int serialId;
 
-
 void setIteratorToFirst()
 {
     FirstFila2(pfilaAptoAlta);
@@ -55,7 +69,7 @@ void setIteratorToFirst()
 
 void scheduler()
 {
-	// seta iteradores das filas pra primeiro
+    // seta iteradores das filas pra primeiro
     setIteratorToFirst();
 
     if (runningThread->whereFrom == FROM_YIELD)
@@ -108,7 +122,7 @@ void scheduler()
         if (AppendFila2(pfilaTerminado, (void *)runningThread) != 0)
             printf(" func scheduler: Erro ao inserir a thread na fila de terminados");
 
-		// desbloqueia todas threads que estavam esperando a runninghtread terminar
+        // desbloqueia todas threads que estavam esperando a runninghtread terminar
         TCB_t *blockedThread;
 
         do
@@ -149,6 +163,20 @@ void scheduler()
         }
         while (!NextFila2(pfilaBloqueado));
     }
+    else if (runningThread->whereFrom == FROM_CWAIT)
+    {
+
+        runningThread->state = PROCST_BLOQ;
+        // veio do cwait: poem a thread em bloqueado
+        if (AppendFila2(pfilaBloqueado, (void *)runningThread) != 0)
+            printf(" func scheduler: Erro ao inserir a thread na fila de bloqueados");
+        else
+        {
+            FirstFila2(pfilaBloqueado);
+        }
+        // faz com que quando o contexto da thread voltar ela não caia no scheduler
+        runningThread->whereFrom = FROM_END;
+    }
 
     // o que acontece pra todas -> seleciona uma da fila de aptos (da maior prioridade possivel)
     // tira ela (delete) e atualiza a runningthread;
@@ -182,9 +210,10 @@ void scheduler()
     thread->state = PROCST_EXEC;
     runningThread = thread;
 
-    // seta o contexto pra thread que está pra rodar
+    // seta o contexto pra thread que está pra rodarsem->count--;
     setcontext(&(runningThread->context));
 };
+
 
 
 void initQueues()
@@ -287,13 +316,17 @@ int ccreate(void *(*start)(void *), void *arg, int prio)
 
 int csetprio(int tid, int prio)
 {
-    return -1;
+    if (tid != NULL || prio > BAIXA_PRIORIDADE || prio < ALTA_PRIORIDADE)
+        return -1;
+    else
+    {
+        runningThread->prio = prio;
+        return 0;
+    }
 }
 
 int cyield(void)
 {
-
-
     //muda o estado para apto e coloca em uma das filas
 
     runningThread->whereFrom = FROM_YIELD;
@@ -316,9 +349,6 @@ int cyield(void)
 int cjoin(int tid)
 {
     int retorno;
-    // procurar em todas as filas uma thread com a thread->tid = tid
-    // se ela tiver isWaitingMe != 1, retorna código de erro (já tem uma thread esperando ela)
-    // se não, poem a runningThread na fila de bloqueados, thread->isWaitingMe = runningThread->tid
 
     //procura a thread com tid
     TCB_t *toBeWaited;
@@ -374,7 +404,7 @@ int cjoin(int tid)
                 if (!found)
                 {
                     // nao achou nao tem
-                    retorno= -1;
+                    retorno = -1;
                 }
             }
         }
@@ -392,18 +422,19 @@ int cjoin(int tid)
             // tudo bem pode esperar
             // agora a runningthread ta esperando a thread acabar
             toBeWaited->isWaitingMe = runningThread->tid;
+            // ela vai cair no if pra fazer o scheduler e quando voltar não vai (ja fez)
             runningThread->whereFrom = FROM_JOIN;
             // salva o contexto da thread que ta rodando (ela vai ser bloqueada)
             getcontext(&(runningThread->context));
             //quando a execução dela voltar ela volta aqui, mas ja passou pelo scheduler
             // que mudou o whereFrom dela
-            if ( (runningThread->whereFrom) == FROM_JOIN)
+            if ((runningThread->whereFrom) == FROM_JOIN)
             {
                 scheduler();
             }
             else
             {
-                retorno= 0;
+                retorno = 0;
             }
         }
     }
@@ -411,48 +442,175 @@ int cjoin(int tid)
     return retorno;
 }
 
-
 int csem_init(csem_t *sem, int count)
 {
-    return -1;
+    sem->count = count;
+
+    sem->fila = (PFILA2) malloc(sizeof(PFILA2));
+
+    if(CreateFila2(sem->fila) != 0)
+        return -1;
+    else
+        FirstFila2(sem->fila);
+
+    return 0;
 }
 
 int cwait(csem_t *sem)
 {
-    return -1;
+    if(sem == NULL)
+    {
+        return ERROR_NULL_PARAM;
+    }
+
+    int status = 0;
+
+    if(sem->count <= 0)
+    {
+        runningThread->whereFrom = FROM_CWAIT;
+        status = AppendFila2(sem->fila, runningThread);
+        getcontext(&(runningThread->context));
+
+        if (status != 0)
+        {
+            return ERROR_CANT_APPEND_THREAD;
+        }
+
+
+        if(runningThread->whereFrom == FROM_CWAIT)
+            scheduler();
+    }
+    sem->count--;
+    return SUCCESS;
 }
 
 int csignal(csem_t *sem)
 {
-    return -1;
+    //incrementa o contador para indicar que o recurso foi liberado
+    sem->count += 1;
+
+    //procura uma thread de alta prioridade para desalocar da fila do semáforo
+    int found =0;
+    TCB_t *ThreadFromSem;
+    FirstFila2(sem->fila);
+
+    do
+    {
+        ThreadFromSem = (TCB_t *)GetAtIteratorFila2(sem->fila);
+        if (ThreadFromSem != NULL && ThreadFromSem->prio == ALTA_PRIORIDADE)
+        {
+            found = 1;
+            DeleteAtIteratorFila2(sem->fila);
+        }
+    }
+    while(!NextFila2(sem->fila) && !found);
+    if (!found)
+    {
+        //se não houver uma de alta prioridade procura uma thread de media prioridade na fila do semáforo
+        FirstFila2(sem->fila);
+        do
+        {
+            ThreadFromSem = (TCB_t *)GetAtIteratorFila2(sem->fila);
+            if (ThreadFromSem != NULL && ThreadFromSem->prio == MEDIA_PRIORIDADE)
+            {
+                found = 1;
+                DeleteAtIteratorFila2(sem->fila);
+            }
+        }
+        while(!NextFila2(sem->fila) && !found);
+        if(!found)
+        {
+            // se não houver de media prioridade procura uma de baixa prioridade na fila do semáforo
+            FirstFila2(sem->fila);
+            do
+            {
+                ThreadFromSem = (TCB_t *)GetAtIteratorFila2(sem->fila);
+                if(ThreadFromSem != NULL && ThreadFromSem->prio == BAIXA_PRIORIDADE)
+                {
+                    found =1;
+                    DeleteAtIteratorFila2(sem->fila);
+                }
+            }
+            while(!NextFila2(sem->fila) && !found);
+				//printf(" Nao tem nenhuma thread na fila do semaforo \n");
+
+        }
+    }
+    // coloca a thread em alguma fila de aptos
+
+    if(found)
+    {
+        ThreadFromSem->state = PROCST_APTO;
+        setIteratorToFirst();
+        switch (ThreadFromSem->prio)
+        {
+        case BAIXA_PRIORIDADE:
+            if (AppendFila2(pfilaAptoBaixa, (void *)ThreadFromSem) != 0)
+            {
+                printf(" func csignal: Erro ao inserir a thread na fila de aptos");
+                return ERROR_APPEND_THREAD;
+            }
+            else
+                FirstFila2(pfilaAptoBaixa);
+            break;
+        case MEDIA_PRIORIDADE:
+            if (AppendFila2(pfilaAptoMedia, (void *)ThreadFromSem) != 0)
+            {
+                printf(" func csignal: Erro ao inserir a thread na fila de aptos");
+                return ERROR_APPEND_THREAD;
+            }
+            else
+                FirstFila2(pfilaAptoMedia);
+            break;
+        case ALTA_PRIORIDADE:
+            if (AppendFila2(pfilaAptoAlta, (void *)ThreadFromSem) != 0)
+            {
+                printf(" func csignal: Erro ao inserir a thread na fila de aptos");
+                return ERROR_APPEND_THREAD;
+            }
+            else
+                FirstFila2(pfilaAptoAlta);
+            break;
+        }
+        // remove a thread da fila dos bloqueados
+        FirstFila2(pfilaBloqueado);
+
+        int tid_ThreadFromSem = ThreadFromSem->tid;
+        found=0;
+
+        do
+        {
+            ThreadFromSem = (TCB_t *)GetAtIteratorFila2(pfilaBloqueado);
+            if (ThreadFromSem != NULL && ThreadFromSem->tid == tid_ThreadFromSem)
+            {
+                found = 1;
+                DeleteAtIteratorFila2(pfilaBloqueado);
+            }
+        }
+        while(!NextFila2(pfilaBloqueado) && !found);
+    }
+    return SUCCESS;
 }
 
 int cidentify(char *name, int size)
 {
-    strncpy(name, "Sergio Cechin - 2017/1 - Teste de compilacao.", size);
-    return 0;
+
+    if (size < MINIMUM_STRING_SIZE)
+    {
+        return ERROR_MINIMUM_SIZE_NOT_ENOUGH;
+    }
+
+    strncpy(name, "Afonso Ferrer - 252856\nDiego Dimer - 287690\nEduardo Paim - 277322", size);
+    return SUCCESS;
 }
+
+
+
+
 
 
 int	id0, id1, id2, id3;
-
-void* func0(void *arg)
-{
-    printf("Eu sou a thread ID1\n");
-    cjoin(id1);
-    cyield();
-    cjoin(id2);
-    cyield();
-    cjoin(id3);
-    printf("ID0 voltando pra terminar\n");
-
-}
-
-void* func1(void *arg)
-{
-    cyield();
-    printf("Eu sou a thread ID2\n");
-}
+csem_t* sem;
 
 void* func2(void *arg)
 {
@@ -464,20 +622,45 @@ void* func3(void *arg)
     printf("Eu sou a thread ID4\n");
 }
 
+
+
+
+void* func0(void *arg)
+{
+    printf("Eu sou a thread ID1 pedindo o recurso\n");
+    cwait(sem);
+    printf("ID1 desbloqueada!\n");
+    csignal(sem);
+}
+
+void* func1(void *arg)
+{
+    printf("Eu sou a thread ID2 pedindo o recurso\n");
+    cwait(sem);
+    printf("ID2 desbloqueada\n");
+    csignal(sem);
+
+}
+
 int main(int argc, char *argv[])
 {
 
 
     int i=0;
+    sem = malloc(sizeof(csem_t));
+    csem_init(sem, 1);
 
-    id0 = ccreate(func0, (void *)&i, 0);
-    id1 = ccreate(func1, (void *)&i, 0);
-    id2 = ccreate(func2, (void *)&i, MEDIA_PRIORIDADE);
-    id3 = ccreate(func3, (void *)&i, BAIXA_PRIORIDADE);
+    id0 = ccreate(func0, (void *)&i, ALTA_PRIORIDADE);
+    id1 = ccreate(func1, (void *)&i, BAIXA_PRIORIDADE);
 
-    printf("Eu sou a main após a criação de ID0 e ID1\n");
-
-    cjoin(id0);
+    printf("Eu sou a main pegando o recurso\n");
+    cwait(sem);
+    printf("Main com o recurso yieldando\n");
+    cyield(); // rodar ID1 e ID2
+    printf("Main liberando o recurso\n");
+    csignal(sem);
+    cyield(); // rodar ID1
+    cyield(); // rodar ID2
 
     printf("Eu sou a main voltando para terminar o programa\n");
 }
