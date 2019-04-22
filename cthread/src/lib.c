@@ -26,6 +26,9 @@
 #define ERROR_CANT_BLOCK_THREAD -2
 #define ERROR_CANT_APPEND_THREAD -3
 
+//csignal
+#define ERROR_REMOVE_THREAD -1
+#define ERROR_APPEND_THREAD -2
 
 // essa é a thread que está em execução no momento
 TCB_t *runningThread;
@@ -477,7 +480,7 @@ int cwait(csem_t *sem)
 int csignal(csem_t *sem)
 {
 	//incrementa o contador para indicar que o recurso foi liberado
-	sem->count = sem->count + 1;
+	sem->count = sem->count++;
 	
 	//procura uma thread de alta prioridade para desalocar da fila do semáforo
 	int found =0;
@@ -491,7 +494,7 @@ int csignal(csem_t *sem)
 		{
 			found = 1;
 		}
-	} while (!NextFila2(sem->fila) && !found);
+	} while(!NextFila2(sem->fila) && !found);
 	if (!found)
 	{
 		//se não houver uma de alta prioridade procura uma thread de media prioridade na fila do semáforo
@@ -503,7 +506,7 @@ int csignal(csem_t *sem)
 			{
 				found = 1;
 			}
-		} while (!NextFila2(sem->fila) && !found);
+		} while(!NextFila2(sem->fila) && !found);
 		if(!found)
 		{
 			// se não houver de media prioridade procura uma de baixa prioridade na fila do semáforo
@@ -534,7 +537,7 @@ int csignal(csem_t *sem)
 				if (AppendFila2(pfilaAptoBaixa, (void *)ThreadFromSem) != 0)
 				{
 					printf(" func csignal: Erro ao inserir a thread na fila de aptos");
-					return -1;
+					return ERROR_APPEND_THREAD;
 				}else
 					FirstFila2(pfilaAptoBaixa);
 				break;
@@ -542,7 +545,7 @@ int csignal(csem_t *sem)
 				if (AppendFila2(pfilaAptoMedia, (void *)ThreadFromSem) != 0)
 				{
 					printf(" func csignal: Erro ao inserir a thread na fila de aptos");
-					return -1;
+					return ERROR_APPEND_THREAD;
 				}else
 					FirstFila2(pfilaAptoMedia);
 				break;
@@ -550,7 +553,7 @@ int csignal(csem_t *sem)
 				if (AppendFila2(pfilaAptoAlta, (void *)ThreadFromSem) != 0)
 				{
 					printf(" func csignal: Erro ao inserir a thread na fila de aptos");
-					return -1;
+					return ERROR_APPEND_THREAD;
 				}else
 					FirstFila2(pfilaAptoAlta);
 				break;
@@ -559,7 +562,7 @@ int csignal(csem_t *sem)
 		
 		
 		
-		// remove a thread da fila dos bloqueados
+		// remove a thread da fila dos bloqueados 
 		FirstFila2(pfilaBloqueado);
 		
 		int tid_ThreadFromSem = ThreadFromSem->tid;
@@ -573,7 +576,7 @@ int csignal(csem_t *sem)
 				found = 1;
 				break;
 			}
-		} while (!NextFila2(pfilaBloquead) && !found);
+		} while(!NextFila2(pfilaBloquead) && !found);
 		if(found)
 		{
 			DeleteAtIteratorFila2(pfilaBloqueado);
@@ -581,15 +584,39 @@ int csignal(csem_t *sem)
 		else
 		{
 			printf("thread estava na fila do semaforo mas nao na fila dos bloqueados \n");
-			return -1;
+			return ERROR_REMOVE_THREAD;
 		}
+		
+		// remove a thread da fila do semaforo
+		FirstFila2(sem_>fila);
+		
+		found=0;
+			
+		do
+		{
+			ThreadFromSem = (TCB_t *)GetAtIteratorFila2(sem->fila);
+			if (ThreadFromSem != NULL && ThreadFromSem->tid == tid_ThreadFromSem)
+			{
+				found = 1;
+				break;
+			}
+		} while(!NextFila2(sem->fila) && !found);
+		if(found)
+		{
+			DeleteAtIteratorFila2(sem->fila);
+		}
+		else
+		{
+			printf(" erro ao remover thread da lista do semaforo \n");
+			return ERROR_REMOVE_THREAD;
+		}	
 		
 	}
 	
 	
 	
 	
-	return 0;
+	return SUCCESS;
 }
 
 int cidentify(char *name, int size)
