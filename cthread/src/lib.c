@@ -1,5 +1,6 @@
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "../include/support.h"
 #include "../include/cthread.h"
@@ -21,7 +22,6 @@
 #define SUCCESS 0
 
 // cwait
-#define SUCCESS 0;
 #define ERROR_NULL_PARAM -1
 #define ERROR_CANT_BLOCK_THREAD -2
 #define ERROR_CANT_APPEND_THREAD -3
@@ -32,9 +32,6 @@
 
 // essa é a thread que está em execução no momento
 TCB_t *runningThread;
-
-// thread main
-TCB_t *mainThread;
 
 // scheduler: toda thread quando finaliza aponta pra esse contexto. Ele vai ser o responsável
 // por tirar uma thread da fila de aptos e por em execução
@@ -71,7 +68,7 @@ void scheduler()
 {
 	// seta iteradores das filas pra primeiro
     setIteratorToFirst();
-    
+
     if (runningThread->whereFrom == FROM_YIELD)
     {
         // se veio da cyield -> thread volta pra sua fila de aptos
@@ -80,19 +77,19 @@ void scheduler()
         {
         case BAIXA_PRIORIDADE:
             if (AppendFila2(pfilaAptoBaixa, (void *)runningThread) != 0)
-                printf(" func yield: Erro ao inserir a thread na fila de aptos");
+                printf(" func yield: Erro ao inserir a thread na fila de aptos\n");
             else
                 FirstFila2(pfilaAptoBaixa);
             break;
         case MEDIA_PRIORIDADE:
             if (AppendFila2(pfilaAptoMedia, (void *)runningThread) != 0)
-                printf(" func yield: Erro ao inserir a thread na fila de aptos");
+                printf(" func yield: Erro ao inserir a thread na fila de aptos\n");
             else
                 FirstFila2(pfilaAptoMedia);
             break;
         case ALTA_PRIORIDADE:
             if (AppendFila2(pfilaAptoAlta, (void *)runningThread) != 0)
-                printf(" func yield: Erro ao inserir a thread na fila de aptos");
+                printf(" func yield: Erro ao inserir a thread na fila de aptos\n");
             else
                 FirstFila2(pfilaAptoAlta);
             break;
@@ -106,7 +103,7 @@ void scheduler()
         runningThread->state = PROCST_BLOQ;
         // veio do join: poem a thread em bloqueado
         if (AppendFila2(pfilaBloqueado, (void *)runningThread) != 0)
-            printf(" func scheduler: Erro ao inserir a thread na fila de bloqueados");
+            printf(" func scheduler: Erro ao inserir a thread na fila de bloqueados\n");
         else
         {
             FirstFila2(pfilaBloqueado);
@@ -120,7 +117,7 @@ void scheduler()
         //poem na fila de terminados
         runningThread->state = PROCST_TERMINO;
         if (AppendFila2(pfilaTerminado, (void *)runningThread) != 0)
-            printf(" func scheduler: Erro ao inserir a thread na fila de terminados");
+            printf(" func scheduler: Erro ao inserir a thread na fila de terminados\n");
 
 		// desbloqueia todas threads que estavam esperando a runninghtread terminar
         TCB_t *blockedThread;
@@ -139,19 +136,19 @@ void scheduler()
                 {
                 case BAIXA_PRIORIDADE:
                     if (AppendFila2(pfilaAptoBaixa, (void *)blockedThread) != 0)
-                        printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos");
+                        printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos\n");
                     else
                         FirstFila2(pfilaAptoBaixa);
                     break;
                 case MEDIA_PRIORIDADE:
                     if (AppendFila2(pfilaAptoMedia, (void *)blockedThread) != 0)
-                        printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos");
+                        printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos\n");
                     else
                         FirstFila2(pfilaAptoMedia);
                     break;
                 case ALTA_PRIORIDADE:
                     if (AppendFila2(pfilaAptoAlta, (void *)blockedThread) != 0)
-                        printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos");
+                        printf(" func scheduler/from_end: Erro ao inserir a thread na fila de aptos\n");
                     else
                         FirstFila2(pfilaAptoAlta);
                     break;
@@ -168,7 +165,7 @@ void scheduler()
         runningThread->state = PROCST_BLOQ;
         // veio do cwait: poem a thread em bloqueado
         if (AppendFila2(pfilaBloqueado, (void *)runningThread) != 0)
-            printf(" func scheduler: Erro ao inserir a thread na fila de bloqueados");
+            printf(" func scheduler: Erro ao inserir a thread na fila de bloqueados\n");
         else
         {
             FirstFila2(pfilaBloqueado);
@@ -190,7 +187,7 @@ void scheduler()
         {
             thread = (TCB_t *)GetAtIteratorFila2(pfilaAptoBaixa);
             if (thread == NULL)
-                printf("eita geovanaa");
+                printf("eita geovanaa\n");
             else
             {
                 DeleteAtIteratorFila2(pfilaAptoBaixa);
@@ -208,9 +205,10 @@ void scheduler()
 
     thread->state = PROCST_EXEC;
     runningThread = thread;
-
     // seta o contexto pra thread que está pra rodar
-    setcontext(&(runningThread->context));
+
+    setcontext(&(thread->context));
+
 };
 
 
@@ -230,26 +228,28 @@ void initQueues()
 	/// inicializa as filas
 	pfilaAptoAlta = &filaAptoAlta;
 	if (CreateFila2(pfilaAptoAlta) != 0)
-		printf("Erro criando fila apto alta prioridade!");
+		printf("Erro criando fila apto alta prioridade!\n");
 
 	pfilaAptoMedia = &filaAptoMedia;
 	if (CreateFila2(pfilaAptoMedia) != 0)
-		printf("Erro criando fila AptoMedia!");
+		printf("Erro criando fila AptoMedia!\n");
 
 	pfilaAptoBaixa = &filaAptoBaixa;
 	if (CreateFila2(pfilaAptoBaixa) != 0)
-		printf("Erro criando fila AptoBaixa!");
+		printf("Erro criando fila AptoBaixa!\n");
 
 	pfilaBloqueado = &filaBloqueado;
 	if (CreateFila2(pfilaBloqueado) != 0)
-		printf("Erro criando fila Bloqueado!");
+		printf("Erro criando fila Bloqueado!\n");
 
 	pfilaTerminado = &filaTerminado;
 	if (CreateFila2(pfilaTerminado) != 0)
-		printf("Erro criando fila Terminado!");
+		printf("Erro criando fila Terminado!\n");
 
 	setIteratorToFirst();
 
+	// thread main
+    TCB_t *mainThread;
 	//main thread: alocação dela
 	mainThread = malloc(sizeof(TCB_t));
 	mainThread->tid = 0;				 // thread main tem o tid = 0
@@ -292,19 +292,19 @@ int ccreate(void *(*start)(void *), void *arg, int prio)
 	{
 	case BAIXA_PRIORIDADE:
 		if (AppendFila2(pfilaAptoBaixa, (void *)newThread) != 0)
-			printf("Erro ao inserir a nova thread na fila de aptos");
+			printf("Erro ao inserir a nova thread na fila de aptos\n");
 		else
 			FirstFila2(pfilaAptoBaixa);
 		break;
 	case MEDIA_PRIORIDADE:
 		if (AppendFila2(pfilaAptoMedia, (void *)newThread) != 0)
-			printf("Erro ao inserir a nova thread na fila de aptos");
+			printf("Erro ao inserir a nova thread na fila de aptos\n");
 		else
 			FirstFila2(pfilaAptoMedia);
 		break;
 	case ALTA_PRIORIDADE:
 		if (AppendFila2(pfilaAptoAlta, (void *)newThread) != 0)
-			printf("Erro ao inserir a nova thread na fila de aptos");
+			printf("Erro ao inserir a nova thread na fila de aptos\n");
 		else
 			FirstFila2(pfilaAptoAlta);
 		break;
@@ -315,7 +315,7 @@ int ccreate(void *(*start)(void *), void *arg, int prio)
 
 int csetprio(int tid, int prio)
 {
-	if (tid != NULL || prio > BAIXA_PRIORIDADE || prio < ALTA_PRIORIDADE)
+	if (tid != (int)NULL || prio > BAIXA_PRIORIDADE || prio < ALTA_PRIORIDADE)
 		return -1;
 	else
 	{
@@ -326,7 +326,6 @@ int csetprio(int tid, int prio)
 
 int cyield(void)
 {
-	printf("chegando na cyiled");
 
 	//muda o estado para apto e coloca em uma das filas
 
@@ -336,7 +335,7 @@ int cyield(void)
 
 	if (getcontext(&(runningThread->context)) == -1)
 	{
-		printf("func yield: Erro ao salvar o contexto da thread atual");
+		printf("func yield: Erro ao salvar o contexto da thread atual\n");
 		return -1;
 	}
 
@@ -350,7 +349,7 @@ int cyield(void)
 int cjoin(int tid)
 {
 	int retorno;
-	
+
 	//procura a thread com tid
 	TCB_t *toBeWaited;
 
@@ -545,7 +544,7 @@ int csignal(csem_t *sem)
         case BAIXA_PRIORIDADE:
             if (AppendFila2(pfilaAptoBaixa, (void *)ThreadFromSem) != 0)
             {
-                printf(" func csignal: Erro ao inserir a thread na fila de aptos");
+                printf(" func csignal: Erro ao inserir a thread na fila de aptos\n");
                 return ERROR_APPEND_THREAD;
             }
             else
@@ -554,7 +553,7 @@ int csignal(csem_t *sem)
         case MEDIA_PRIORIDADE:
             if (AppendFila2(pfilaAptoMedia, (void *)ThreadFromSem) != 0)
             {
-                printf(" func csignal: Erro ao inserir a thread na fila de aptos");
+                printf(" func csignal: Erro ao inserir a thread na fila de aptos\n");
                 return ERROR_APPEND_THREAD;
             }
             else
@@ -563,7 +562,7 @@ int csignal(csem_t *sem)
         case ALTA_PRIORIDADE:
             if (AppendFila2(pfilaAptoAlta, (void *)ThreadFromSem) != 0)
             {
-                printf(" func csignal: Erro ao inserir a thread na fila de aptos");
+                printf(" func csignal: Erro ao inserir a thread na fila de aptos\n");
                 return ERROR_APPEND_THREAD;
             }
             else

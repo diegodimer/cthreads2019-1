@@ -16,18 +16,36 @@ INC_DIR=./include
 BIN_DIR=./bin
 SRC_DIR=./src
 
-all: regra1 regra2 regran
+biblioteca:	regra1 regra2
 
-regra1: #dependências para a regra1
-	$(CC) -o $(BIN_DIR)regra1 $(SRC_DIR)regra1.c -Wall
+all: regra1 regra2 testes
+	
+regra1: #cria o .o da biblioteca
+	@echo "Criando arquivo lib.o"
+	$(CC) -c $(SRC_DIR)/lib.c -o $(BIN_DIR)/lib.o -Wall
+	@echo " "
 
-regra2: #dependências para a regra2
-	$(CC) -o $(BIN_DIR)regra2 $(SRC_DIR)regra2.c -Wall
-
-regran: #dependências para a regran
-	$(CC) -o $(BIN_DIR)regran $(SRC_DIR)regran.c -Wall
+regra2: #cria o .a da biblioteca
+	@echo "Criando arquivo libcthread.a"
+	ar rcs $(LIB_DIR)/libcthread.a $(BIN_DIR)/*.o 
+	@echo " "
 
 clean:
-	rm -rf $(LIB_DIR)/*.a $(BIN_DIR)/*.o $(SRC_DIR)/*~ $(INC_DIR)/*~ *~
+	@echo "Arquivos da biblioteca e binarios de teste sendo apagados"
+	rm -rf $(LIB_DIR)/*.a $(BIN_DIR)/lib.o ./testes/*.run
+	@echo " "
 
+testes:	teste1 teste2 teste3 teste4
 
+teste1:
+	@echo "Criando arquivos de teste"
+	@echo " "
+	gcc -static testes/csem.c -L$(LIB_DIR) -I$(INC_DIR) -lcthread -o testes/csem.run 
+teste2:
+	gcc -static testes/cjoin.c -L$(LIB_DIR) -I$(INC_DIR) -lcthread -o testes/cjoin.run 
+teste3:
+	gcc -static testes/cidentify.c -L$(LIB_DIR) -I$(INC_DIR) -lcthread -o testes/cidentify.run 
+teste4:
+	gcc -static testes/demais.c -L$(LIB_DIR) -I$(INC_DIR) -lcthread -o testes/demais.run 	
+	@echo " "
+	
