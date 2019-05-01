@@ -66,6 +66,7 @@ void setIteratorToFirst()
 
 void scheduler()
 {
+
 	// seta iteradores das filas pra primeiro
     setIteratorToFirst();
 
@@ -206,8 +207,9 @@ void scheduler()
     thread->state = PROCST_EXEC;
     runningThread = thread;
     // seta o contexto pra thread que está pra rodar
-
-    setcontext(&(thread->context));
+    if(setcontext(&(thread->context)) == -1){
+        printf("SOS\n");
+    };
 
 };
 
@@ -280,6 +282,7 @@ int ccreate(void *(*start)(void *), void *arg, int prio)
 
 	newThread->context.uc_stack.ss_sp = malloc(sizeof(SIGSTKSZ));
 	newThread->context.uc_stack.ss_size = SIGSTKSZ;
+	newThread->context.uc_stack.ss_flags = 0;
 
 	newThread->whereFrom = FROM_END;
 	newThread->isWaitingMe = -1;
@@ -315,6 +318,9 @@ int ccreate(void *(*start)(void *), void *arg, int prio)
 
 int csetprio(int tid, int prio)
 {
+    if (!initialized)
+		initQueues(); // inicializa as filas (todas)
+
 	if (tid != (int)NULL || prio > BAIXA_PRIORIDADE || prio < ALTA_PRIORIDADE)
 		return -1;
 	else
@@ -326,6 +332,8 @@ int csetprio(int tid, int prio)
 
 int cyield(void)
 {
+    if (!initialized)
+		initQueues(); // inicializa as filas (todas)
 
 	//muda o estado para apto e coloca em uma das filas
 
@@ -342,12 +350,19 @@ int cyield(void)
 	//se a thread chamou essa função agora (isto é, não está retornando sua execução) o scheduler é chamado
 	if (runningThread->whereFrom == FROM_YIELD)
 		scheduler();
+    else {
+        printf("CYIELD VOLTANDO PARA THREAD ID %d!\n", runningThread->tid);
+        return 0;
+    }
 
-	return 0;
+    return 0;
 }
 
 int cjoin(int tid)
 {
+    if (!initialized)
+		initQueues(); // inicializa as filas (todas)
+
 	int retorno;
 
 	//procura a thread com tid
@@ -440,6 +455,9 @@ int cjoin(int tid)
 
 int csem_init(csem_t *sem, int count)
 {
+    if (!initialized)
+		initQueues(); // inicializa as filas (todas)
+
     sem->count = count;
 
     sem->fila = (PFILA2) malloc(sizeof(PFILA2));
@@ -455,6 +473,9 @@ int csem_init(csem_t *sem, int count)
 
 int cwait(csem_t *sem)
 {
+    if (!initialized)
+		initQueues(); // inicializa as filas (todas)
+
     if(sem == NULL)
     {
         return ERROR_NULL_PARAM;
@@ -483,6 +504,8 @@ int cwait(csem_t *sem)
 
 int csignal(csem_t *sem)
 {
+    if (!initialized)
+		initQueues(); // inicializa as filas (todas)
     //incrementa o contador para indicar que o recurso foi liberado
     sem->count += 1;
 
@@ -591,6 +614,8 @@ int csignal(csem_t *sem)
 
 int cidentify(char *name, int size)
 {
+    if (!initialized)
+		initQueues(); // inicializa as filas (todas)
 
 	if (size < MINIMUM_STRING_SIZE)
 	{
