@@ -27,9 +27,6 @@ gera_todos:
 roda_todos:
 	@for f in $(shell ls ${MYDIR}/*.run); do echo "Rodando arquivo teste " $${f}; ./$${f} ; echo " "; done
 	
-	
-problematico:
-	gcc -static problematika.c -L$(LIB_DIR) -I$(INC_DIR) -lcthread -o problematika.run 	
 
 clean:
 	@echo "Arquivos de teste sendo apagados"

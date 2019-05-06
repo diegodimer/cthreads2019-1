@@ -26,8 +26,6 @@ typedef struct s_TCB {
 
 	/* A PARTIR DESSE PONTO PODEM SER ACRESCENTADOS CAMPOS NECESS�RIOS AO DESENVOLVIMENTO DA BIBLIOTECA
 	*/
-
-	int whereFrom;
 	// tid da thread que está esperando essa thread acabar (função cjoin)
 	int isWaitingMe;
 

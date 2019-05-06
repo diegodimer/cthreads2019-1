@@ -8,6 +8,7 @@ csem_t* sem;
 
 void* func1(void *arg)
 {
+    printf("A\n");
     printf("%d", cyield());
     printf("OI\n");
     printf("Eu sou a thread ID1 %d\n", (int)arg);
@@ -28,6 +29,8 @@ void* func3(void *arg)
 void* func4(void *arg)
 {
     csetprio((int)NULL, 0); // muda prioridade para alta
+    cyield();
+    cyield();
     cyield();
     printf("Eu sou a thread ID4 %d\n", (int)arg);
 }
