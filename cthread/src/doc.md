@@ -7,7 +7,7 @@
 
 |scheduler|Detalhes|
 |--|--|
-|@brief|Função responsável pela manutenção das filas da biblioteca. É para onde as thread em execução vai quando precisa ser bloqueada, terminada ou ceder a CPU.|
+|@brief|Função responsável pela manutenção das filas da biblioteca. É para onde a thread em execução vai quando precisa ser bloqueada, terminada ou ceder a CPU.|
 |@retval|None|
 
 
@@ -49,28 +49,28 @@
  
 |csem_init|Detalhes|
 |--|--|
-|@brief||
-|@param|sem: |
-|@param|count: |
-|@retval|||
+|@brief|inicializa a fila e o contador do semáforo|
+|@param|*sem: ponteiro para a estrutura do semáforo|
+|@param|count: número de threads que podem usar o recurso|
+|@retval|-1 se houve um problema na criação da fila do semáforo, 0 caso contrário||
 
 
 
  
 |cwait|Detalhes|
 |--|--|
-|@brief||
-|@param|sem: |
-|@retval|||
+|@brief|solicita um recurso, se count <= 0 a thread é bloqueada e colocada na fila de espera do semáforo|
+|@param|*sem: ponteiro para a estrutura do semáforo|
+|@retval|-1 se o ponteiro do semáforo é NULL, -3 se não conseguir colocar a thread na fila do semáforo, 0 se não houve erros||
 
 
 
  
 |csignal|Detalhes|
 |--|--|
-|@brief||
-|@param|sem: |
-|@retval|||
+|@brief| incrementa o sem->count para indicar que um recurso foi desalocado, tira uma thread da fila do semáforo e a coloca em uma fila de aptos, remove essa thread da fila dos bloqueados|
+|@param|*sem: ponteiro para a estrutura do semáforo |
+|@retval|-2 se não conseguiu inserir a thread na fila de aptos, o se não houve erros||
 
 
 

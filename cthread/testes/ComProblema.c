@@ -9,7 +9,9 @@ csem_t* sem;
 void* func1(void *arg)
 {
     printf("A\n");
-    printf("%d", cyield());
+    printf("%d", cyield());  // nessa linha no retorno da cyield da segmentation fault
+	// cjoin( id3 ) funcionaria
+	// cjoin( id2 ) da segmentation fault também
     printf("OI\n");
     printf("Eu sou a thread ID1 %d\n", (int)arg);
 }

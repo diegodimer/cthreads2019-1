@@ -213,6 +213,7 @@ void initQueues()
 	schedulerC.uc_link = NULL;
 	schedulerC.uc_stack.ss_sp = (char *)malloc(sizeof(SIGSTKSZ));
 	schedulerC.uc_stack.ss_size = SIGSTKSZ;
+    schedulerC.uc_stack.ss_flags = 0;
 	// aqui não tem o problema do setcontext pq o makecontext faz o scheduler ir pra função dele
 	makecontext(&schedulerC, (void (*)(void))scheduler, 0);
 
@@ -246,9 +247,6 @@ void initQueues()
 	mainThread->tid = 0;				 // thread main tem o tid = 0
 	mainThread->state = PROCST_EXEC;	 // main thread ta executando
 	mainThread->prio = BAIXA_PRIORIDADE; // main tem baixa prioridade
-	mainThread->context.uc_link = NULL;
-	mainThread->context.uc_stack.ss_size = SIGSTKSZ;
-	mainThread->context.uc_stack.ss_sp = malloc(sizeof(SIGSTKSZ));
 	mainThread->isWaitingMe = -1;
 	runningThread = mainThread;
 	getcontext(&(mainThread->context));
