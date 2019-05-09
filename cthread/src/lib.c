@@ -462,11 +462,11 @@ int cjoin(int tid)
 }
 
 /**
- * @brief  
+ * @brief  inicializa a fila e o contador do semáforo
  * @note   
- * @param  *sem: 
- * @param  count: 
- * @retval 
+ * @param  *sem: ponteiro para a estrutura do semáforo
+ * @param  count: número de threads que podem usar o recurso
+ * @retval -1 se houve um problema na criação da fila do semáforo, 0 caso contrário
  */
 int csem_init(csem_t *sem, int count)
 {
@@ -486,10 +486,10 @@ int csem_init(csem_t *sem, int count)
 }
 
 /**
- * @brief  
+ * @brief solicita um recurso, se count <= 0 a thread é bloqueada e colocada na fila de espera do semáforo
  * @note   
- * @param  *sem: 
- * @retval 
+ * @param  *sem: ponteiro para a estrutura do semáforo
+ * @retval -1 se o ponteiro do semáforo é NULL, -3 se não conseguir colocar a thread na fila do semáforo, 0 se não houve erros
  */
 int cwait(csem_t *sem)
 {
@@ -523,10 +523,10 @@ int cwait(csem_t *sem)
 }
 
 /**
- * @brief  
+ * @brief incrementa o sem->count para indicar que um recurso foi desalocado, tira uma thread da fila do semáforo e a coloca em uma fila de aptos, remove essa thread da fila dos bloqueados
  * @note   
- * @param  *sem: 
- * @retval 
+ * @param  *sem: ponteiro para a estrutura do semáforo
+ * @retval -2 se não conseguiu inserir a thread na fila de aptos, o se não houve erros
  */
 int csignal(csem_t *sem)
 {
@@ -643,7 +643,7 @@ int csignal(csem_t *sem)
  * @note   
  * @param  *name: ponteiro para string a ser preenchida com nome dos integrantes do grupo
  * @param  size: tamanho da string no ponteiro name
- * @retval 
+ * @retval -1 se a string tem tamanho menor que 69, 0 se não houve erros
  */
 int cidentify(char *name, int size)
 {
